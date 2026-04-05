@@ -1,25 +1,22 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import API_URL from "../../config";
 
-const API = "http://localhost:5000/api";
 const getHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const EMPTY = { name: "", email: "", department: "Computer Science" };
 
 export default function FacultyManagement() {
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [list,     setList]     = useState([]);
+  const [loading,  setLoading]  = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY);
-  const [message, setMessage] = useState(null);
+  const [form,     setForm]     = useState(EMPTY);
+  const [message,  setMessage]  = useState(null);
 
   const load = () => {
     setLoading(true);
-    axios.get(`${API}/faculty`, { headers: getHeaders() })
+    axios.get(`${API_URL}/api/faculty`, { headers: getHeaders() })
       .then((r) => setList(r.data.data || []))
-      .catch(() => setList([
-        { id: 1, name: "Dr. Ramesh Kumar", email: "ramesh@college.edu", department: "Computer Science" },
-        { id: 2, name: "Prof. Sunita Rao", email: "sunita@college.edu", department: "Computer Science" },
-      ]))
+      .catch(() => setList([]))
       .finally(() => setLoading(false));
   };
 
@@ -28,7 +25,7 @@ export default function FacultyManagement() {
   const handleAdd = (e) => {
     e.preventDefault();
     setLoading(true);
-    axios.post(`${API}/faculty`, form, { headers: getHeaders() })
+    axios.post(`${API_URL}/api/faculty`, form, { headers: getHeaders() })
       .then(() => {
         setMessage({ type: "success", text: "✅ Faculty added successfully!" });
         setForm(EMPTY);
@@ -91,9 +88,7 @@ export default function FacultyManagement() {
       <div className="table-wrapper">
         <table>
           <thead>
-            <tr>
-              <th>#</th><th>Name</th><th>Email</th><th>Department</th>
-            </tr>
+            <tr><th>#</th><th>Name</th><th>Email</th><th>Department</th></tr>
           </thead>
           <tbody>
             {loading ? (
@@ -101,11 +96,11 @@ export default function FacultyManagement() {
             ) : list.length === 0 ? (
               <tr><td colSpan={4} style={{ textAlign: "center", padding: 30, color: "#999" }}>No faculty found</td></tr>
             ) : list.map((f, i) => (
-              <tr key={f.id}>
+              <tr key={f.faculty_id || f.id}>
                 <td style={{ color: "#999" }}>{i + 1}</td>
-                <td style={{ fontWeight: 600 }}>{f.name}</td>
+                <td style={{ fontWeight: 600 }}>{f.faculty_name || f.name}</td>
                 <td style={{ fontSize: 13, color: "#666" }}>{f.email}</td>
-                <td>{f.department}</td>
+                <td>{f.department_name || f.department}</td>
               </tr>
             ))}
           </tbody>
