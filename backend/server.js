@@ -21,8 +21,24 @@ app.use("/api/programmes",     require("./routes/programmes"));
 app.use("/api/cia-components", require("./routes/cia-components"));
 app.use("/api/cia-marks",      require("./routes/cia-marks-new"));
 
-app.use((req, res) => res.status(404).json({ success: false, message: `Route ${req.path} not found` }));
-app.use((err, req, res, next) => { console.error(err); res.status(500).json({ success: false, message: "Internal server error" }); });
+app.get("/", (req, res) => {
+  res.send("CIA Backend Running Successfully 🚀");
+});
 
+// 404
+app.use((req, res) =>
+  res.status(404).json({ success: false, message: `Route ${req.path} not found` })
+);
+
+// error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ success: false, message: "Internal server error" });
+});
+
+// Render port
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
