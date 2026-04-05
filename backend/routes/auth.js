@@ -34,7 +34,7 @@ router.post("/login", (req, res) => {
       // ✅ Generate JWT token
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role, name: user.name },
-        process.env.JWT_SECRET || "cia_management_super_secret_key_2024",
+        process.env.JWT_SECRET || "cia_secret",
         { expiresIn: "24h" }
       );
 
