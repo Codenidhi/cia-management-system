@@ -1,6 +1,17 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import API_URL from "../../config"; // already includes /api
+import API_URL from "../../config";
+
+// Safe parse — never crashes on "undefined" or null stored in localStorage
+const safeParseUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw || raw === "undefined" || raw === "null") return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
 
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
@@ -8,7 +19,8 @@ export const loginUser = createAsyncThunk(
     try {
       const res = await axios.post(`${API_URL}/auth/login`, { email, password, role });
       const { token, user } = res.data;
-      localStorage.setItem("token", token);
+      if (token) localStorage.setItem("token", token);
+      if (user)  localStorage.setItem("user", JSON.stringify(user));
       return user;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || "Login failed");
@@ -19,9 +31,9 @@ export const loginUser = createAsyncThunk(
 const authSlice = createSlice({
   name: "auth",
   initialState: {
-    user: JSON.parse(localStorage.getItem("user") || "null"),
+    user:    safeParseUser(),
     loading: false,
-    error: null,
+    error:   null,
   },
   reducers: {
     logout(state) {
@@ -39,9 +51,11 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
-        localStorage.setItem("user", JSON.stringify(action.payload));
       })
-      .addCase(loginUser.rejected,  (state, action) => { state.loading = false; state.error = action.payload; });
+      .addCase(loginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
