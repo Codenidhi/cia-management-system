@@ -4,7 +4,15 @@ require("dotenv").config();
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// ✅ Allow both local dev and Render frontend
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://cia-frontend-8ue3.onrender.com",
+  ],
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use((req, res, next) => { console.log(`${req.method} ${req.path}`); next(); });
 
@@ -21,24 +29,18 @@ app.use("/api/programmes",     require("./routes/programmes"));
 app.use("/api/cia-components", require("./routes/cia-components"));
 app.use("/api/cia-marks",      require("./routes/cia-marks-new"));
 
-app.get("/", (req, res) => {
-  res.send("CIA Backend Running Successfully 🚀");
-});
-
 // 404
 app.use((req, res) =>
   res.status(404).json({ success: false, message: `Route ${req.path} not found` })
 );
 
-// error handler
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ success: false, message: "Internal server error" });
 });
 
-// Render port
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
