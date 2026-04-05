@@ -1,60 +1,59 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import API_URL from "../../config";
+import API_URL from "../../config"; // already includes /api
 
 const getHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
   "Content-Type": "application/json",
 });
 
-export const fetchStudents = createAsyncThunk(
-  "students/fetchAll",
-  async (_, { rejectWithValue }) => {
+export const fetchMarksByCourse = createAsyncThunk(
+  "marks/fetchByCourse",
+  async (courseName, { rejectWithValue }) => {
     try {
-      const res = await axios.get(`${API_URL}/api/students`, { headers: getHeaders() });
+      const res = await axios.get(`${API_URL}/marks?course=${encodeURIComponent(courseName)}`, { headers: getHeaders() });
       return res.data.data || [];
-    } catch {
-      return rejectWithValue([]);
-    }
+    } catch { return rejectWithValue([]); }
   }
 );
 
-export const addStudent = createAsyncThunk(
-  "students/add",
-  async (studentData, { rejectWithValue }) => {
+export const fetchStudentMarks = createAsyncThunk(
+  "marks/fetchStudentMarks",
+  async (usn, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/students`, studentData, { headers: getHeaders() });
+      const res = await axios.get(`${API_URL}/marks/student/${usn}`, { headers: getHeaders() });
+      return res.data.data || [];
+    } catch { return rejectWithValue([]); }
+  }
+);
+
+export const saveMarks = createAsyncThunk(
+  "marks/save",
+  async ({ course, students }, { rejectWithValue }) => {
+    try {
+      const res = await axios.post(`${API_URL}/marks`, { course, students }, { headers: getHeaders() });
       return res.data;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to add student");
-    }
+    } catch (err) { return rejectWithValue(err.response?.data?.message || "Save failed"); }
   }
 );
 
-export const deleteStudent = createAsyncThunk(
-  "students/delete",
-  async (id, { rejectWithValue }) => {
-    try {
-      await axios.delete(`${API_URL}/api/students/${id}`, { headers: getHeaders() });
-      return id;
-    } catch (err) {
-      return rejectWithValue(err.response?.data?.message || "Failed to delete student");
-    }
-  }
-);
-
-const studentsSlice = createSlice({
-  name: "students",
-  initialState: { list: [], loading: false, error: null },
-  reducers: {},
+const marksSlice = createSlice({
+  name: "marks",
+  initialState: { courseMarks: [], studentMarks: [], loading: false, saveStatus: null },
+  reducers: { clearSaveStatus(state) { state.saveStatus = null; } },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchStudents.pending,   (state) => { state.loading = true; })
-      .addCase(fetchStudents.fulfilled, (state, action) => { state.loading = false; state.list = action.payload; })
-      .addCase(fetchStudents.rejected,  (state) => { state.loading = false; state.list = []; })
-      .addCase(addStudent.fulfilled,    (state) => { state.loading = false; })
-      .addCase(deleteStudent.fulfilled, (state, action) => { state.list = state.list.filter((s) => s.id !== action.payload); });
+      .addCase(fetchMarksByCourse.pending,   (s) => { s.loading = true; })
+      .addCase(fetchMarksByCourse.fulfilled, (s, a) => { s.loading = false; s.courseMarks = a.payload; })
+      .addCase(fetchMarksByCourse.rejected,  (s) => { s.loading = false; s.courseMarks = []; })
+      .addCase(fetchStudentMarks.pending,    (s) => { s.loading = true; })
+      .addCase(fetchStudentMarks.fulfilled,  (s, a) => { s.loading = false; s.studentMarks = a.payload; })
+      .addCase(fetchStudentMarks.rejected,   (s) => { s.loading = false; s.studentMarks = []; })
+      .addCase(saveMarks.pending,   (s) => { s.loading = true; })
+      .addCase(saveMarks.fulfilled, (s) => { s.loading = false; s.saveStatus = "success"; })
+      .addCase(saveMarks.rejected,  (s) => { s.loading = false; s.saveStatus = "error"; });
   },
 });
 
-export default studentsSlice.reducer;
+export const { clearSaveStatus } = marksSlice.actions;
+export default marksSlice.reducer;

@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import API_URL from "../../config";
+import API_URL from "../../config"; // already includes /api
 
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async ({ email, password, role }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, { email, password, role });
+      const res = await axios.post(`${API_URL}/auth/login`, { email, password, role });
       const { token, user } = res.data;
       localStorage.setItem("token", token);
       return user;
@@ -35,19 +35,13 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(loginUser.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
+      .addCase(loginUser.pending,   (state) => { state.loading = true; state.error = null; })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.user = action.payload;
         localStorage.setItem("user", JSON.stringify(action.payload));
       })
-      .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      });
+      .addCase(loginUser.rejected,  (state, action) => { state.loading = false; state.error = action.payload; });
   },
 });
 

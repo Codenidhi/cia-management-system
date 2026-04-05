@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import API_URL from "../../../config";
+import API_URL from "../../../config"; // already includes /api
 
 const getHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -17,19 +17,19 @@ const unwrap = (res) => {
 
 const make = (type, endpoint) => ({
   fetchAll: createAsyncThunk(`data/${type}/fetchAll`, async (_, { rejectWithValue }) => {
-    try   { return unwrap(await axios.get(`${API_URL}/api/${endpoint}`, { headers: getHeaders() })); }
+    try   { return unwrap(await axios.get(`${API_URL}/${endpoint}`, { headers: getHeaders() })); }
     catch (e) { return rejectWithValue(e.response?.data?.message || e.message); }
   }),
   add: createAsyncThunk(`data/${type}/add`, async (body, { rejectWithValue }) => {
-    try   { return unwrap(await axios.post(`${API_URL}/api/${endpoint}`, body, { headers: getHeaders() })); }
+    try   { return unwrap(await axios.post(`${API_URL}/${endpoint}`, body, { headers: getHeaders() })); }
     catch (e) { return rejectWithValue(e.response?.data?.message || e.message); }
   }),
   update: createAsyncThunk(`data/${type}/update`, async ({ id, data }, { rejectWithValue }) => {
-    try   { return unwrap(await axios.put(`${API_URL}/api/${endpoint}/${id}`, data, { headers: getHeaders() })); }
+    try   { return unwrap(await axios.put(`${API_URL}/${endpoint}/${id}`, data, { headers: getHeaders() })); }
     catch (e) { return rejectWithValue(e.response?.data?.message || e.message); }
   }),
   del: createAsyncThunk(`data/${type}/delete`, async (id, { rejectWithValue }) => {
-    try   { await axios.delete(`${API_URL}/api/${endpoint}/${id}`, { headers: getHeaders() }); return id; }
+    try   { await axios.delete(`${API_URL}/${endpoint}/${id}`, { headers: getHeaders() }); return id; }
     catch (e) { return rejectWithValue(e.response?.data?.message || e.message); }
   }),
 });
@@ -44,12 +44,9 @@ const marks  = make("marks",        "cia-marks");
 
 export const fetchAllData = createAsyncThunk("data/fetchAll", async (_, { dispatch }) => {
   await Promise.allSettled([
-    dispatch(dept.fetchAll()),
-    dispatch(prog.fetchAll()),
-    dispatch(stud.fetchAll()),
-    dispatch(fac.fetchAll()),
-    dispatch(course.fetchAll()),
-    dispatch(cia.fetchAll()),
+    dispatch(dept.fetchAll()),   dispatch(prog.fetchAll()),
+    dispatch(stud.fetchAll()),   dispatch(fac.fetchAll()),
+    dispatch(course.fetchAll()), dispatch(cia.fetchAll()),
     dispatch(marks.fetchAll()),
   ]);
 });
@@ -57,24 +54,18 @@ export const fetchAllData = createAsyncThunk("data/fetchAll", async (_, { dispat
 export const addDepartment    = dept.add;
 export const updateDepartment = dept.update;
 export const deleteDepartment = dept.del;
-
-export const addProgramme    = prog.add;
-export const updateProgramme = prog.update;
-export const deleteProgramme = prog.del;
-
-export const addStudent    = stud.add;
-export const deleteStudent = stud.del;
-
-export const addFaculty    = fac.add;
-export const deleteFaculty = fac.del;
-
-export const addCourse    = course.add;
-export const deleteCourse = course.del;
-
+export const addProgramme     = prog.add;
+export const updateProgramme  = prog.update;
+export const deleteProgramme  = prog.del;
+export const addStudent       = stud.add;
+export const deleteStudent    = stud.del;
+export const addFaculty       = fac.add;
+export const deleteFaculty    = fac.del;
+export const addCourse        = course.add;
+export const deleteCourse     = course.del;
 export const addCIAComponent    = cia.add;
 export const updateCIAComponent = cia.update;
 export const deleteCIAComponent = cia.del;
-
 export const addMarks    = marks.add;
 export const updateMarks = marks.update;
 
