@@ -1,224 +1,130 @@
-import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { saveMarks, clearSaveStatus, fetchMarksByCourse } from "../../store/slices/marksSlice";
-import axios from "axios";
-import API_URL from "../../config";
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+const { authMiddleware, requireRole } = require("../middleware/auth");
 
-const MAX_MARKS    = 30;
-const PASSING_MARKS = 15;
+// GET /api/marks?course=courseName — get marks for a course (faculty view)
+router.get("/", authMiddleware, (req, res) => {
+  const course = req.query.course;
+  if (!course) {
+    // Return all marks
+    db.query(
+      `SELECT cm.id AS marks_id, cm.student_id, s.usn, s.name AS student_name,
+              cm.course_id, c.course_name, cc.type AS cia_type, cc.max_marks,
+              cm.marks_obtained AS total
+       FROM cia_marks_new cm
+       JOIN students s        ON cm.student_id       = s.id
+       JOIN courses c         ON cm.course_id        = c.id
+       JOIN cia_components cc ON cm.cia_component_id = cc.id
+       ORDER BY s.usn`,
+      (err, results) => {
+        if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
+        res.json({ success: true, data: results });
+      }
+    );
+    return;
+  }
 
-const getHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem("token")}`,
-  "Content-Type": "application/json",
+  db.query(
+    `SELECT cm.id, s.usn, s.name AS student_name, cm.marks_obtained AS total,
+            c.course_name, cc.type AS cia_type, cc.max_marks
+     FROM cia_marks_new cm
+     JOIN students s        ON cm.student_id       = s.id
+     JOIN courses c         ON cm.course_id        = c.id
+     JOIN cia_components cc ON cm.cia_component_id = cc.id
+     WHERE c.course_name = ?
+     ORDER BY s.usn`,
+    [course],
+    (err, results) => {
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
+      res.json({ success: true, data: results });
+    }
+  );
 });
 
-export default function CIAMarks() {
-  const dispatch = useDispatch();
-  const { courseMarks, loading, saveStatus } = useSelector((s) => s.marks);
-
-  const [courses,   setCourses]   = useState([]);
-  const [course,    setCourse]    = useState("");
-  const [students,  setStudents]  = useState([]);
-  const [marks,     setMarks]     = useState({}); // { [usn]: value }
-  const [message,   setMessage]   = useState(null);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-
-  // Load courses from API on mount
-  useEffect(() => {
-    axios.get(`${API_URL}/courses`, { headers: getHeaders() })
-      .then((res) => {
-        const list = res.data.data || [];
-        setCourses(list);
-        if (list.length > 0) setCourse(list[0].course_name || list[0].name);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Load real students from API on mount
-  useEffect(() => {
-    setLoadingStudents(true);
-    axios.get(`${API_URL}/students`, { headers: getHeaders() })
-      .then((res) => {
-        const list = (res.data.data || []).map((s) => ({
-          usn:  s.usn,
-          name: s.student_name || s.name,
-          id:   s.student_id   || s.id,
-        }));
-        setStudents(list);
-      })
-      .catch(() => setStudents([]))
-      .finally(() => setLoadingStudents(false));
-  }, []);
-
-  // When course changes, fetch existing marks so faculty sees what was already entered
-  useEffect(() => {
-    if (course) dispatch(fetchMarksByCourse(course));
-  }, [course, dispatch]);
-
-  // Pre-fill marks input with already-saved values
-  useEffect(() => {
-    if (courseMarks.length === 0) { setMarks({}); return; }
-    const pre = {};
-    courseMarks.forEach((m) => { if (m.usn) pre[m.usn] = String(m.total ?? ""); });
-    setMarks(pre);
-  }, [courseMarks]);
-
-  // Show save status alerts
-  useEffect(() => {
-    if (saveStatus === "success") {
-      setMessage({ type: "success", text: "✅ Marks saved! Students can now view them on their dashboard." });
-      dispatch(clearSaveStatus());
-      setTimeout(() => setMessage(null), 4000);
-    } else if (saveStatus === "error") {
-      setMessage({ type: "error", text: "❌ Failed to save marks. Check backend." });
-      dispatch(clearSaveStatus());
+// GET /api/marks/student/:usn — get all marks for a student
+router.get("/student/:usn", authMiddleware, (req, res) => {
+  db.query(
+    `SELECT cm.id AS marks_id, s.usn, s.name AS student_name,
+            c.course_name, cc.type AS cia_type, cc.max_marks,
+            cm.marks_obtained AS total
+     FROM cia_marks_new cm
+     JOIN students s        ON cm.student_id       = s.id
+     JOIN courses c         ON cm.course_id        = c.id
+     JOIN cia_components cc ON cm.cia_component_id = cc.id
+     WHERE s.usn = ?
+     ORDER BY c.course_name, cc.type`,
+    [req.params.usn],
+    (err, results) => {
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
+      res.json({ success: true, data: results });
     }
-  }, [saveStatus, dispatch]);
-
-  const handleChange = (usn, value) => {
-    if (value !== "" && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > MAX_MARKS)) return;
-    setMarks((prev) => ({ ...prev, [usn]: value }));
-  };
-
-  const handleSave = () => {
-    const withMarks = students
-      .map((s) => ({ ...s, total: marks[s.usn] ?? "" }))
-      .filter((s) => s.total !== "");
-
-    if (withMarks.length === 0) {
-      setMessage({ type: "error", text: "❌ Enter marks for at least one student." });
-      setTimeout(() => setMessage(null), 3000);
-      return;
-    }
-    dispatch(saveMarks({ course, students: students.map((s) => ({ ...s, total: marks[s.usn] ?? "" })) }));
-  };
-
-  const exportCSV = () => {
-    const rows = [
-      ["USN", "Name", "Total Marks", "Status"],
-      ...students.map((s) => {
-        const t      = Number(marks[s.usn] || 0);
-        const status = marks[s.usn] != null && marks[s.usn] !== ""
-          ? (t >= PASSING_MARKS ? "Pass" : "Fail")
-          : "Not Entered";
-        return [s.usn, s.name, t, status];
-      }),
-    ];
-    const csv  = rows.map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url;
-    a.download = `${(course || "course").replace(/\s+/g, "_")}_CIA_Marks.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const filled = students.filter((s) => marks[s.usn] != null && marks[s.usn] !== "");
-  const passed  = filled.filter((s) => Number(marks[s.usn]) >= PASSING_MARKS);
-  const failed  = filled.filter((s) => Number(marks[s.usn]) <  PASSING_MARKS);
-  const passPct = filled.length > 0 ? ((passed.length / filled.length) * 100).toFixed(1) : 0;
-
-  return (
-    <div className="card">
-      <h2 style={{ color: "#800000", marginBottom: 20 }}>Enter CIA Marks</h2>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Course:</label>
-          <select
-            className="form-input form-select"
-            style={{ width: "auto", minWidth: 220 }}
-            value={course}
-            onChange={(e) => setCourse(e.target.value)}
-            disabled={courses.length === 0}
-          >
-            {courses.length === 0 && <option value="">Loading courses…</option>}
-            {courses.map((c) => {
-              const name = c.course_name || c.name;
-              return <option key={c.course_id || c.id || name} value={name}>{name}</option>;
-            })}
-          </select>
-        </div>
-        <div style={{ display: "flex", gap: 10 }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={exportCSV}>📥 Export CSV</button>
-          <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨️ Print</button>
-        </div>
-      </div>
-
-      {message && (
-        <div className={`alert ${message.type === "success" ? "alert-success" : "alert-error"}`}>
-          {message.text}
-        </div>
-      )}
-
-      {filled.length > 0 && (
-        <div className="stats-grid" style={{ marginBottom: 16 }}>
-          <div className="stat-card"><div className="stat-value">{passed.length}</div><div className="stat-label">Passed</div></div>
-          <div className="stat-card"><div className="stat-value">{failed.length}</div><div className="stat-label">Failed</div></div>
-          <div className="stat-card"><div className="stat-value">{passPct}%</div><div className="stat-label">Pass Rate</div></div>
-        </div>
-      )}
-
-      <div className="table-wrapper" style={{ marginBottom: 20 }}>
-        <table>
-          <thead>
-            <tr>
-              <th>USN</th>
-              <th>Student Name</th>
-              <th style={{ textAlign: "center" }}>Total Marks (/{MAX_MARKS})</th>
-              <th style={{ textAlign: "center" }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(loading || loadingStudents) ? (
-              <tr><td colSpan={4} style={{ textAlign: "center", padding: 30, color: "#800000" }}>Loading…</td></tr>
-            ) : students.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: "center", padding: 30, color: "#999" }}>
-                No students found. Add students from the Admin panel first.
-              </td></tr>
-            ) : students.map((s) => {
-              const val     = marks[s.usn] ?? "";
-              const total   = Number(val);
-              const hasMark = val !== "" && val != null;
-              return (
-                <tr key={s.usn}>
-                  <td style={{ color: "#800000", fontWeight: 500 }}>{s.usn}</td>
-                  <td style={{ fontWeight: 500 }}>{s.name}</td>
-                  <td style={{ textAlign: "center" }}>
-                    <input
-                      type="number"
-                      min={0}
-                      max={MAX_MARKS}
-                      step={0.5}
-                      placeholder="Enter marks"
-                      value={val}
-                      onChange={(e) => handleChange(s.usn, e.target.value)}
-                      className="marks-input"
-                    />
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    {hasMark && (
-                      <span className={total >= PASSING_MARKS ? "badge-pass" : "badge-fail"}>
-                        {total >= PASSING_MARKS ? "✅ Pass" : "❌ Fail"}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <button
-        className="btn btn-primary no-print"
-        onClick={handleSave}
-        disabled={loading || loadingStudents}
-        style={{ padding: "12px 32px", fontSize: 15 }}
-      >
-        {loading ? "Saving…" : "💾 Save All Marks"}
-      </button>
-    </div>
   );
-}
+});
+
+// POST /api/marks — save marks for multiple students (faculty enters marks)
+router.post("/", authMiddleware, requireRole("faculty", "admin"), (req, res) => {
+  const { course, students } = req.body;
+  if (!course || !students || students.length === 0) {
+    return res.status(400).json({ success: false, message: "Course and students required" });
+  }
+
+  // Get course id
+  db.query("SELECT id FROM courses WHERE course_name = ?", [course], (err, courseRows) => {
+    if (err) return res.status(500).json({ success: false, message: "DB error" });
+
+    const courseId = courseRows.length > 0 ? courseRows[0].id : null;
+    if (!courseId) return res.status(400).json({ success: false, message: `Course '${course}' not found` });
+
+    // Get first CIA component as default
+    db.query("SELECT id, max_marks FROM cia_components LIMIT 1", (err2, ciaRows) => {
+      if (err2) return res.status(500).json({ success: false, message: "DB error" });
+
+      const ciaId   = ciaRows.length > 0 ? ciaRows[0].id       : 1;
+      const maxMarks = ciaRows.length > 0 ? ciaRows[0].max_marks : 30;
+
+      const withMarks = students.filter((s) => s.total !== "" && s.total !== null && s.total !== undefined);
+      if (withMarks.length === 0) {
+        return res.json({ success: true, message: "No marks to save" });
+      }
+
+      let completed = 0;
+      let hasError  = false;
+
+      withMarks.forEach((student) => {
+        // Get student id by USN
+        db.query("SELECT id FROM students WHERE usn = ?", [student.usn], (err3, studentRows) => {
+          if (err3 || studentRows.length === 0) {
+            completed++;
+            if (completed === withMarks.length) {
+              res.json({ success: true, message: "Marks saved (some students not found)" });
+            }
+            return;
+          }
+
+          const studentId = studentRows[0].id;
+
+          // Insert or update marks in cia_marks_new
+          db.query(
+            `INSERT INTO cia_marks_new (student_id, course_id, cia_component_id, usn, student_name, marks_obtained, entered_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained)`,
+            [studentId, courseId, ciaId, student.usn, student.name, student.total, req.user?.id || 1],
+            (err4) => {
+              if (err4) hasError = true;
+              completed++;
+              if (completed === withMarks.length) {
+                if (hasError) {
+                  return res.status(500).json({ success: false, message: "Some marks failed to save" });
+                }
+                res.json({ success: true, message: `${completed} marks saved successfully` });
+              }
+            }
+          );
+        });
+      });
+    });
+  });
+});
+
+module.exports = router;
