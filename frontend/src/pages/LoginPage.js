@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="login-logo">
           <div style={{ fontSize: 48, marginBottom: 8 }}>🎓</div>
           <h1>CIA Management System</h1>
-          <p>MCA Department · Computer Science</p>
+          <p>Postgraduate Centre</p>
         </div>
 
         {/* Role Tabs */}
