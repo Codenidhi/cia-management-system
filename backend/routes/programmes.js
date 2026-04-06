@@ -18,7 +18,7 @@ router.get("/", authMiddleware, (req, res) => {
      LEFT JOIN departments d ON p.department_id = d.id
      ORDER BY p.name`,
     (err, results) => {
-      if (err) return res.status(500).json({ success: false, message: "DB error" });
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
       res.json({ success: true, data: results });
     }
   );
@@ -36,7 +36,7 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ success: false, message: "Error adding programme: " + err.message });
 
-      // Fetch back with department name joined
+      // Fetch back with department name
       db.query(
         `SELECT p.id AS programme_id, p.name AS programme_name, p.department_id,
                 d.name AS department_name, p.duration, p.total_semesters, p.status
@@ -44,9 +44,8 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
          WHERE p.id = ?`,
         [result.insertId],
         (err2, rows) => {
-          if (err2 || rows.length === 0) {
+          if (err2 || rows.length === 0)
             return res.json({ success: true, data: { programme_id: result.insertId, programme_name: name } });
-          }
           res.json({ success: true, data: rows[0] });
         }
       );

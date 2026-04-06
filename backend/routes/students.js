@@ -18,7 +18,7 @@ router.get("/", authMiddleware, requireRole("admin", "faculty"), (req, res) => {
      LEFT JOIN programmes p ON s.programme_id = p.id
      ORDER BY s.usn`,
     (err, results) => {
-      if (err) return res.status(500).json({ success: false, message: "DB error" });
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
       res.json({ success: true, data: results });
     }
   );
@@ -29,7 +29,8 @@ router.get("/:usn", authMiddleware, (req, res) => {
   db.query(
     `SELECT s.id AS student_id, s.usn, s.name AS student_name, s.email, s.semester,
             s.programme_id, p.name AS programme_name
-     FROM students s LEFT JOIN programmes p ON s.programme_id = p.id
+     FROM students s
+     LEFT JOIN programmes p ON s.programme_id = p.id
      WHERE s.usn = ?`,
     [req.params.usn],
     (err, results) => {
@@ -42,28 +43,39 @@ router.get("/:usn", authMiddleware, (req, res) => {
 
 // POST /api/students
 router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
-  const { student_name, usn, email, semester, programme_id, dob, password } = req.body;
+  const { student_name, usn, email, semester, programme_id, password } = req.body;
   const name = student_name || req.body.name;
   if (!usn || !name) return res.status(400).json({ success: false, message: "USN and name required" });
 
   db.query(
-    "INSERT INTO students (usn, name, email, semester, programme_id, dob, password) VALUES (?,?,?,?,?,?,?)",
-    [usn, name, email || null, semester || 1, programme_id || null, dob || null, password || null],
+    "INSERT INTO students (usn, name, email, semester, programme_id) VALUES (?,?,?,?,?)",
+    [usn, name, email || null, semester || 1, programme_id || null],
     (err, result) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ success: false, message: "USN already exists" });
-        // If columns don't exist, try simpler insert
-        db.query(
-          "INSERT INTO students (usn, name, email, semester) VALUES (?,?,?,?)",
-          [usn, name, email || null, semester || 1],
-          (err2, result2) => {
-            if (err2) return res.status(500).json({ success: false, message: "Error adding student: " + err2.message });
-            res.json({ success: true, data: { student_id: result2.insertId, usn, student_name: name, email, semester } });
-          }
-        );
-        return;
+        return res.status(500).json({ success: false, message: "Error adding student: " + err.message });
       }
-      res.json({ success: true, data: { student_id: result.insertId, usn, student_name: name, email, semester } });
+
+      // Also add to users table for login
+      if (password && email) {
+        db.query(
+          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'student') ON DUPLICATE KEY UPDATE password=VALUES(password)",
+          [name, email, password],
+          () => {}
+        );
+      }
+
+      res.json({
+        success: true,
+        data: {
+          student_id:   result.insertId,
+          usn,
+          student_name: name,
+          email:        email || '',
+          semester:     semester || 1,
+          programme_id: programme_id || null,
+        }
+      });
     }
   );
 });

@@ -7,24 +7,16 @@ const { authMiddleware, requireRole } = require("../middleware/auth");
 router.get("/", authMiddleware, requireRole("admin"), (req, res) => {
   db.query(
     `SELECT 
-       f.id              AS faculty_id,
-       f.name            AS faculty_name,
+       f.id            AS faculty_id,
+       f.name          AS faculty_name,
        f.email,
-       f.designation,
        f.department_id,
-       d.name            AS department_name
+       d.name          AS department_name
      FROM faculty f
      LEFT JOIN departments d ON f.department_id = d.id
      ORDER BY f.name`,
     (err, results) => {
-      if (err) {
-        // Fallback if department_id column doesn't exist
-        db.query("SELECT id AS faculty_id, name AS faculty_name, email, designation, department AS department_name FROM faculty ORDER BY name", (err2, r2) => {
-          if (err2) return res.status(500).json({ success: false, message: "DB error" });
-          res.json({ success: true, data: r2 });
-        });
-        return;
-      }
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
       res.json({ success: true, data: results });
     }
   );
@@ -32,27 +24,35 @@ router.get("/", authMiddleware, requireRole("admin"), (req, res) => {
 
 // POST /api/faculty
 router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
-  const { faculty_name, email, designation, department_id, password } = req.body;
+  const { faculty_name, email, department_id, designation, password } = req.body;
   const name = faculty_name || req.body.name;
   if (!name || !email) return res.status(400).json({ success: false, message: "Name and email required" });
 
   db.query(
-    "INSERT INTO faculty (name, email, designation, department_id, password) VALUES (?,?,?,?,?)",
-    [name, email, designation || null, department_id || null, password || null],
+    "INSERT INTO faculty (name, email, department_id) VALUES (?, ?, ?)",
+    [name, email, department_id || null],
     (err, result) => {
-      if (err) {
-        // Fallback: simpler insert without department_id
+      if (err) return res.status(500).json({ success: false, message: "Error adding faculty: " + err.message });
+
+      // Also add to users table for login
+      if (password) {
         db.query(
-          "INSERT INTO faculty (name, email, department) VALUES (?,?,?)",
-          [name, email, req.body.department || "Computer Science"],
-          (err2, r2) => {
-            if (err2) return res.status(500).json({ success: false, message: "Error adding faculty: " + err2.message });
-            res.json({ success: true, data: { faculty_id: r2.insertId, faculty_name: name, email } });
-          }
+          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, 'faculty') ON DUPLICATE KEY UPDATE password=VALUES(password)",
+          [name, email, password],
+          () => {}
         );
-        return;
       }
-      res.json({ success: true, data: { faculty_id: result.insertId, faculty_name: name, email, designation, department_id } });
+
+      res.json({
+        success: true,
+        data: {
+          faculty_id:      result.insertId,
+          faculty_name:    name,
+          email,
+          department_id:   department_id || null,
+          department_name: '',
+        }
+      });
     }
   );
 });
