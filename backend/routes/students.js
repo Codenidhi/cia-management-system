@@ -22,7 +22,6 @@ const StudentList = () => {
         },
       });
 
-      // Handles both res.data and res.data.data
       const data = Array.isArray(res.data) ? res.data : res.data.data;
       setStudents(data || []);
     } catch (error) {
@@ -37,14 +36,17 @@ const StudentList = () => {
     const searchText = search.toLowerCase().trim();
     if (!searchText) return true;
 
+    const semFull  = `sem${student.semester}`;   // "sem1"
+    const semSpace = `sem ${student.semester}`;  // "sem 1"
+
     return (
       student.student_name?.toLowerCase().includes(searchText) ||
       student.usn?.toLowerCase().includes(searchText) ||
       student.email?.toLowerCase().includes(searchText) ||
       student.programme_name?.toLowerCase().includes(searchText) ||
-      `sem${student.semester}`.includes(searchText) ||     // matches "sem1"
-      `sem ${student.semester}`.includes(searchText) ||    // matches "sem 1"
-      String(student.semester).includes(searchText)        // matches "1"
+      semFull.includes(searchText) ||    // "sem1".includes("sem") ✅
+      semSpace.includes(searchText) ||   // "sem 1".includes("sem") ✅
+      String(student.semester).includes(searchText)
     );
   });
 
@@ -75,7 +77,11 @@ const StudentList = () => {
 
       {/* Table */}
       {!loading && !error && (
-        <table border="1" cellPadding="10" style={{ borderCollapse: "collapse", width: "100%" }}>
+        <table
+          border="1"
+          cellPadding="10"
+          style={{ borderCollapse: "collapse", width: "100%" }}
+        >
           <thead style={{ backgroundColor: "#f2f2f2" }}>
             <tr>
               <th>#</th>
