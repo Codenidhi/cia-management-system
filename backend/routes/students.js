@@ -4,44 +4,39 @@ const db = require("../config/db");
 const { authMiddleware, requireRole } = require("../middleware/auth");
 
 // GET /api/students
-// - ?course_id=X  → returns students in that course's programme (for faculty)
-// - no filter     → all students (admin)
 router.get("/", authMiddleware, requireRole("admin", "faculty"), (req, res) => {
   const { course_id } = req.query;
 
   if (course_id) {
-    // Get programme_id from the course, then get matching students
-    db.query(
-      "SELECT programme_id FROM courses WHERE id = ?",
-      [course_id],
-      (err, courses) => {
-        if (err) return res.status(500).json({ success: false, message: "DB error" });
-        if (!courses || courses.length === 0)
-          return res.json({ success: true, data: [] });
-
-        const programme_id = courses[0].programme_id;
-        db.query(
-          `SELECT s.id, s.usn, s.name, s.email, s.semester, s.programme_id,
-                  p.name AS programme_name
-           FROM students s
-           LEFT JOIN programmes p ON s.programme_id = p.id
-           WHERE s.programme_id = ?
-           ORDER BY s.usn`,
-          [programme_id],
-          (err2, results) => {
-            if (err2) return res.status(500).json({ success: false, message: "DB error" });
-            res.json({ success: true, data: results });
-          }
-        );
-      }
-    );
+    db.query("SELECT programme_id FROM courses WHERE id = ?", [course_id], (err, courses) => {
+      if (err) return res.status(500).json({ success: false, message: "DB error" });
+      if (!courses || courses.length === 0) return res.json({ success: true, data: [] });
+      const programme_id = courses[0].programme_id;
+      db.query(
+        `SELECT s.id, s.usn, s.name, s.email, s.semester, s.programme_id,
+                p.name AS programme_name
+         FROM students s
+         LEFT JOIN programmes p ON s.programme_id = p.id
+         WHERE s.programme_id = ?
+         ORDER BY s.usn`,
+        [programme_id],
+        (err2, results) => {
+          if (err2) return res.status(500).json({ success: false, message: "DB error" });
+          res.json({ success: true, data: results });
+        }
+      );
+    });
     return;
   }
 
-  // Admin: all students
   db.query(
-    `SELECT s.id, s.usn, s.name, s.email, s.semester, s.programme_id,
-            p.name AS programme_name
+    `SELECT s.id        AS student_id,
+            s.usn,
+            s.name      AS student_name,
+            s.email,
+            s.semester,
+            s.programme_id,
+            p.name      AS programme_name
      FROM students s
      LEFT JOIN programmes p ON s.programme_id = p.id
      ORDER BY s.usn`,
@@ -54,26 +49,22 @@ router.get("/", authMiddleware, requireRole("admin", "faculty"), (req, res) => {
 
 // GET /api/students/:usn
 router.get("/:usn", authMiddleware, (req, res) => {
-  db.query(
-    "SELECT * FROM students WHERE usn = ?",
-    [req.params.usn],
-    (err, results) => {
-      if (err) return res.status(500).json({ success: false, message: "DB error" });
-      if (results.length === 0)
-        return res.status(404).json({ success: false, message: "Student not found" });
-      res.json({ success: true, data: results[0] });
-    }
-  );
+  db.query("SELECT * FROM students WHERE usn = ?", [req.params.usn], (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: "DB error" });
+    if (results.length === 0) return res.status(404).json({ success: false, message: "Student not found" });
+    res.json({ success: true, data: results[0] });
+  });
 });
 
-// POST /api/students  (admin)
-// Auto-creates a user account so the student can log in immediately
+// POST /api/students (admin) — accepts student_name OR name
 router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
-  const { usn, name, email, semester, programme_id } = req.body;
+  // Accept both field name variants from the form
+  const name         = req.body.student_name || req.body.name;
+  const { usn, email, semester, programme_id, password } = req.body;
+
   if (!usn || !name || !email)
     return res.status(400).json({ success: false, message: "USN, name and email required" });
 
-  // 1. Insert into students table
   db.query(
     "INSERT INTO students (usn, name, email, semester, programme_id) VALUES (?, ?, ?, ?, ?)",
     [usn, name, email, semester || 1, programme_id || null],
@@ -81,22 +72,30 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY")
           return res.status(400).json({ success: false, message: "USN or email already exists" });
-        return res.status(500).json({ success: false, message: "Error adding student" });
+        return res.status(500).json({ success: false, message: "Error adding student: " + err.message });
       }
 
       const studentId = result.insertId;
+      const loginPassword = password || "student123";
 
-      // 2. Auto-create user account (password = student123, or usn as fallback)
+      // Auto-create user account so student can login
       db.query(
         "INSERT IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, 'student')",
-        [name, email, "student123"],
+        [name, email, loginPassword],
         (err2) => {
-          // If user creation fails we still return success — student row exists
           if (err2) console.warn("Could not create user for student:", err2.message);
           res.json({
             success: true,
-            message: "Student added. Login: " + email + " / student123",
+            message: `Student added. Login: ${email} / ${loginPassword}`,
             id: studentId,
+            data: {
+              student_id:    studentId,
+              student_name:  name,
+              usn,
+              email,
+              semester:      semester || 1,
+              programme_id:  programme_id || null,
+            },
           });
         }
       );
@@ -104,9 +103,10 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
   );
 });
 
-// PUT /api/students/:id  (admin)
+// PUT /api/students/:id (admin)
 router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
-  const { name, email, semester, programme_id } = req.body;
+  const name = req.body.student_name || req.body.name;
+  const { email, semester, programme_id } = req.body;
   db.query(
     "UPDATE students SET name=?, email=?, semester=?, programme_id=? WHERE id=?",
     [name, email, semester, programme_id || null, req.params.id],
@@ -117,7 +117,7 @@ router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
   );
 });
 
-// DELETE /api/students/:id  (admin)
+// DELETE /api/students/:id (admin)
 router.delete("/:id", authMiddleware, requireRole("admin"), (req, res) => {
   db.query("DELETE FROM students WHERE id=?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ success: false, message: "Error deleting student" });
