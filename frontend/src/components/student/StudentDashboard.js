@@ -2,29 +2,35 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStudentMarks } from "../../store/slices/marksSlice";
 
-const MAX = 30;
-const PASS = 15;
+const PASS = 40; // 40% passing threshold
 
 export default function StudentDashboard() {
   const dispatch = useDispatch();
-  const { user } = useSelector((s) => s.auth);
+  const { user }  = useSelector((s) => s.auth);
   const { studentMarks, loading } = useSelector((s) => s.marks);
 
   useEffect(() => {
     if (user?.usn) dispatch(fetchStudentMarks(user.usn));
   }, [user, dispatch]);
 
+  // Support both field names: total (old) and marks_obtained (new)
+  const getMarks   = (m) => Number(m.marks_obtained ?? m.total ?? 0);
+  const getMax     = (m) => Number(m.max_marks ?? 30);
+  const getPercent = (m) => {
+    const max = getMax(m);
+    return max > 0 ? ((getMarks(m) / max) * 100).toFixed(1) : '0.0';
+  };
+
   const totalSubjects = studentMarks.length;
-  const passed = studentMarks.filter((m) => Number(m.total) >= PASS).length;
+  const passed = studentMarks.filter((m) => parseFloat(getPercent(m)) >= PASS).length;
   const avgPct = totalSubjects > 0
-    ? ((studentMarks.reduce((acc, m) => acc + Number(m.total || 0), 0) / (totalSubjects * MAX)) * 100).toFixed(1)
+    ? (studentMarks.reduce((acc, m) => acc + parseFloat(getPercent(m)), 0) / totalSubjects).toFixed(1)
     : 0;
 
-  const getColor = (total) => {
-    const pct = (total / MAX) * 100;
-    if (pct >= 70) return "#2e7d32";
-    if (pct >= 50) return "#e65100";
-    return "#c62828";
+  const getColor = (pct) => {
+    if (pct >= 70) return "#660000";
+    if (pct >= 40) return "#8B0000";
+    return "#4d0000";
   };
 
   return (
@@ -32,7 +38,7 @@ export default function StudentDashboard() {
       {/* Welcome */}
       <div className="welcome-card">
         <h1>Welcome, {user?.name}! 👋</h1>
-        <p>View your MCA Continuous Internal Assessment marks below.</p>
+        <p>View your Continuous Internal Assessment marks below.</p>
       </div>
 
       {/* Student Info */}
@@ -45,11 +51,11 @@ export default function StudentDashboard() {
           </div>
           <div className="info-item">
             <div className="info-item-label">Programme</div>
-            <div className="info-item-value">{user?.programme || "MCA"}</div>
+            <div className="info-item-value">{user?.programme || "—"}</div>
           </div>
           <div className="info-item">
             <div className="info-item-label">Semester</div>
-            <div className="info-item-value">{user?.semester || 1}</div>
+            <div className="info-item-value">{user?.semester || "—"}</div>
           </div>
           <div className="info-item">
             <div className="info-item-label">Email</div>
@@ -60,29 +66,17 @@ export default function StudentDashboard() {
 
       {/* Stats */}
       <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{totalSubjects}</div>
-          <div className="stat-label">Total Assessments</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{avgPct}%</div>
-          <div className="stat-label">Average Percentage</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{passed}</div>
-          <div className="stat-label">Subjects Passed</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{totalSubjects - passed}</div>
-          <div className="stat-label">Subjects Failed</div>
-        </div>
+        <div className="stat-card"><div className="stat-value">{totalSubjects}</div><div className="stat-label">Total Assessments</div></div>
+        <div className="stat-card"><div className="stat-value">{avgPct}%</div><div className="stat-label">Average Percentage</div></div>
+        <div className="stat-card"><div className="stat-value">{passed}</div><div className="stat-label">Passed</div></div>
+        <div className="stat-card"><div className="stat-value">{totalSubjects - passed}</div><div className="stat-label">Failed</div></div>
       </div>
 
       {/* Marks Table */}
       <div className="card">
         <div className="card-header">
-          <h2 style={{ color: "#800000" }}>My MCA CIA Marks</h2>
-          <span style={{ fontSize: 13, color: "#666" }}>Passing: {PASS}/{MAX} marks</span>
+          <h2 style={{ color: "#800000" }}>My CIA Marks</h2>
+          <span style={{ fontSize: 13, color: "#666" }}>Pass threshold: {PASS}%</span>
         </div>
 
         {loading ? (
@@ -90,7 +84,7 @@ export default function StudentDashboard() {
         ) : totalSubjects === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-            <div>No marks entered yet. Please check back later.</div>
+            <div>No marks entered yet. Please check back after your faculty enters marks.</div>
           </div>
         ) : (
           <div className="table-wrapper">
@@ -99,40 +93,39 @@ export default function StudentDashboard() {
                 <tr>
                   <th>#</th>
                   <th>Course Name</th>
-                  <th style={{ textAlign: "center" }}>Marks Obtained</th>
-                  <th style={{ textAlign: "center" }}>Max Marks</th>
+                  <th>CIA Type</th>
+                  <th style={{ textAlign: "center" }}>Marks</th>
+                  <th style={{ textAlign: "center" }}>Max</th>
                   <th style={{ textAlign: "center" }}>Percentage</th>
                   <th style={{ textAlign: "center" }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {studentMarks.map((m, i) => {
-                  const total = Number(m.total || 0);
-                  const pct = ((total / MAX) * 100).toFixed(1);
-                  const isPassed = total >= PASS;
+                  const marks    = getMarks(m);
+                  const max      = getMax(m);
+                  const pct      = getPercent(m);
+                  const isPassed = parseFloat(pct) >= PASS;
+                  const color    = getColor(parseFloat(pct));
                   return (
-                    <tr key={m.id}>
+                    <tr key={m.marks_id || m.id || i}>
                       <td>{i + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{m.course_name}</td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{m.course_name}</div>
-                        {m.code && <div style={{ fontSize: 12, color: "#999" }}>{m.code}</div>}
+                        <span style={{ background: '#fff5f5', color: '#8B0000', border: '1px solid rgba(139,0,0,0.3)', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                          {m.cia_type || 'CIA'}
+                        </span>
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        <strong style={{ fontSize: 18, color: getColor(total) }}>{total}</strong>
+                        <strong style={{ fontSize: 18, color }}>{marks}</strong>
                       </td>
-                      <td style={{ textAlign: "center", color: "#666" }}>{MAX}</td>
+                      <td style={{ textAlign: "center", color: "#666" }}>{max}</td>
                       <td style={{ textAlign: "center" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                          <div style={{
-                            width: 60, height: 8, background: "#eee", borderRadius: 4, overflow: "hidden"
-                          }}>
-                            <div style={{
-                              width: `${pct}%`, height: "100%",
-                              background: getColor(total), borderRadius: 4,
-                              transition: "width 0.5s"
-                            }} />
+                          <div style={{ width: 60, height: 8, background: "#ffe4e4", borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(parseFloat(pct), 100)}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.5s" }} />
                           </div>
-                          <span style={{ fontSize: 13, color: getColor(total), fontWeight: 600 }}>{pct}%</span>
+                          <span style={{ fontSize: 13, color, fontWeight: 600 }}>{pct}%</span>
                         </div>
                       </td>
                       <td style={{ textAlign: "center" }}>
@@ -149,9 +142,8 @@ export default function StudentDashboard() {
         )}
       </div>
 
-      {/* Note */}
       <div style={{ background: "#fff5f5", border: "1px solid #f0d0d0", borderLeft: "4px solid #800000", borderRadius: 8, padding: "14px 18px", fontSize: 13, color: "#800000" }}>
-        <strong>ℹ️ Note:</strong> This page shows your CIA marks as entered by your faculty. For queries, contact your department.
+        <strong>ℹ️ Note:</strong> Marks are entered by your faculty. For queries, contact your department.
       </div>
     </div>
   );
