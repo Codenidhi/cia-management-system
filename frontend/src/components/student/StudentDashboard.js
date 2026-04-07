@@ -3,9 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchStudentMarks } from "../../store/slices/marksSlice";
 import Courses from "./Courses";
 
-const MAX = 30;
-const PASS = 15;
-
 export default function StudentDashboard() {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
@@ -70,19 +67,28 @@ function MarksView({ marks, loading }) {
     );
   }
 
+  // Helper: get marks_obtained whether backend sends "marks_obtained" or legacy "total"
+  const getMo  = (m) => Number(m.marks_obtained ?? m.total ?? 0);
+  const getMax = (m) => Number(m.max_marks || 30);
+  const isPassed = (m) => {
+    const mo  = getMo(m);
+    const max = getMax(m);
+    return max > 0 && mo >= Math.ceil(max * 0.5);
+  };
+
   // Group marks by course
   const byCourse = marks.reduce((acc, m) => {
-    const key = m.course_name || m.course_id || "Unknown";
+    const key = m.course_name || "Unknown";
     if (!acc[key]) acc[key] = [];
     acc[key].push(m);
     return acc;
   }, {});
 
-  const totalMarks   = marks.reduce((s, m) => s + Number(m.marks_obtained || 0), 0);
-  const totalMax     = marks.length * MAX;
-  const overallPct   = totalMax > 0 ? Math.round((totalMarks / totalMax) * 100) : 0;
-  const passCount    = marks.filter((m) => Number(m.marks_obtained) >= PASS).length;
-  const failCount    = marks.length - passCount;
+  const totalMarks = marks.reduce((s, m) => s + getMo(m), 0);
+  const totalMax   = marks.reduce((s, m) => s + getMax(m), 0);
+  const overallPct = totalMax > 0 ? Math.round((totalMarks / totalMax) * 100) : 0;
+  const passCount  = marks.filter(isPassed).length;
+  const failCount  = marks.length - passCount;
 
   return (
     <div className="card">
@@ -115,8 +121,8 @@ function MarksView({ marks, loading }) {
 
       {/* Per-course breakdown */}
       {Object.entries(byCourse).map(([course, courseMarks]) => {
-        const cTotal = courseMarks.reduce((s, m) => s + Number(m.marks_obtained || 0), 0);
-        const cMax   = courseMarks.length * MAX;
+        const cTotal = courseMarks.reduce((s, m) => s + getMo(m), 0);
+        const cMax   = courseMarks.reduce((s, m) => s + getMax(m), 0);
         const cPct   = cMax > 0 ? Math.round((cTotal / cMax) * 100) : 0;
 
         return (
@@ -152,26 +158,28 @@ function MarksView({ marks, loading }) {
                 </thead>
                 <tbody>
                   {courseMarks.map((m, i) => {
-                    const mo  = Number(m.marks_obtained || 0);
-                    const pct = Math.round((mo / MAX) * 100);
-                    const pass = mo >= PASS;
+                    const mo  = getMo(m);
+                    const max = getMax(m);
+                    const pct = max > 0 ? Math.round((mo / max) * 100) : 0;
+                    const pass = isPassed(m);
                     return (
-                      <tr key={i}>
+                      <tr key={m.marks_id || i}>
                         <td style={{ fontWeight: 500 }}>
                           {m.cia_type || m.type || `CIA-${i + 1}`}
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <strong style={{ color: pass ? "#2e7d32" : "#c62828" }}>{mo}</strong>
                         </td>
-                        <td style={{ textAlign: "center", color: "#888" }}>{MAX}</td>
+                        <td style={{ textAlign: "center", color: "#888" }}>{max}</td>
                         <td style={{ textAlign: "center" }}>{pct}%</td>
                         <td style={{ textAlign: "center" }}>
                           <span style={{
                             background: pass ? "#e6f4ea" : "#fce8e8",
                             color:      pass ? "#2e7d32" : "#c62828",
-                            padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                            padding: "2px 10px", borderRadius: 12,
+                            fontSize: 12, fontWeight: 600,
                           }}>
-                            {pass ? "Pass" : "Fail"}
+                            {pass ? "✅ Pass" : "❌ Fail"}
                           </span>
                         </td>
                       </tr>
@@ -190,12 +198,12 @@ function MarksView({ marks, loading }) {
 /* ── Profile Tab ───────────────────────────────────────────────── */
 function ProfileView({ user }) {
   const fields = [
-    { label: "Full Name",   value: user?.name },
-    { label: "Email",       value: user?.email },
-    { label: "USN",         value: user?.usn },
-    { label: "Programme",   value: user?.programme },
-    { label: "Semester",    value: user?.semester },
-    { label: "Role",        value: user?.role },
+    { label: "Full Name",  value: user?.name },
+    { label: "Email",      value: user?.email },
+    { label: "USN",        value: user?.usn },
+    { label: "Programme",  value: user?.programme },
+    { label: "Semester",   value: user?.semester },
+    { label: "Role",       value: user?.role },
   ];
 
   return (

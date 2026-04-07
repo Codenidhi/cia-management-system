@@ -7,11 +7,10 @@ const { authMiddleware, requireRole } = require("../middleware/auth");
 router.get("/", authMiddleware, (req, res) => {
   const course = req.query.course;
   if (!course) {
-    // Return all marks
     db.query(
       `SELECT cm.id AS marks_id, cm.student_id, s.usn, s.name AS student_name,
               cm.course_id, c.course_name, cc.type AS cia_type, cc.max_marks,
-              cm.marks_obtained AS total
+              cm.marks_obtained
        FROM cia_marks_new cm
        JOIN students s        ON cm.student_id       = s.id
        JOIN courses c         ON cm.course_id        = c.id
@@ -26,7 +25,8 @@ router.get("/", authMiddleware, (req, res) => {
   }
 
   db.query(
-    `SELECT cm.id, s.usn, s.name AS student_name, cm.marks_obtained AS total,
+    `SELECT cm.id AS marks_id, s.usn, s.name AS student_name,
+            cm.marks_obtained,
             c.course_name, cc.type AS cia_type, cc.max_marks
      FROM cia_marks_new cm
      JOIN students s        ON cm.student_id       = s.id
@@ -47,7 +47,7 @@ router.get("/student/:usn", authMiddleware, (req, res) => {
   db.query(
     `SELECT cm.id AS marks_id, s.usn, s.name AS student_name,
             c.course_name, cc.type AS cia_type, cc.max_marks,
-            cm.marks_obtained AS total
+            cm.marks_obtained
      FROM cia_marks_new cm
      JOIN students s        ON cm.student_id       = s.id
      JOIN courses c         ON cm.course_id        = c.id
@@ -69,21 +69,21 @@ router.post("/", authMiddleware, requireRole("faculty", "admin"), (req, res) => 
     return res.status(400).json({ success: false, message: "Course and students required" });
   }
 
-  // Get course id
   db.query("SELECT id FROM courses WHERE course_name = ?", [course], (err, courseRows) => {
     if (err) return res.status(500).json({ success: false, message: "DB error" });
 
     const courseId = courseRows.length > 0 ? courseRows[0].id : null;
     if (!courseId) return res.status(400).json({ success: false, message: `Course '${course}' not found` });
 
-    // Get first CIA component as default
     db.query("SELECT id, max_marks FROM cia_components LIMIT 1", (err2, ciaRows) => {
       if (err2) return res.status(500).json({ success: false, message: "DB error" });
 
-      const ciaId   = ciaRows.length > 0 ? ciaRows[0].id       : 1;
+      const ciaId    = ciaRows.length > 0 ? ciaRows[0].id        : 1;
       const maxMarks = ciaRows.length > 0 ? ciaRows[0].max_marks : 30;
 
-      const withMarks = students.filter((s) => s.total !== "" && s.total !== null && s.total !== undefined);
+      const withMarks = students.filter(
+        (s) => s.total !== "" && s.total !== null && s.total !== undefined
+      );
       if (withMarks.length === 0) {
         return res.json({ success: true, message: "No marks to save" });
       }
@@ -92,7 +92,6 @@ router.post("/", authMiddleware, requireRole("faculty", "admin"), (req, res) => 
       let hasError  = false;
 
       withMarks.forEach((student) => {
-        // Get student id by USN
         db.query("SELECT id FROM students WHERE usn = ?", [student.usn], (err3, studentRows) => {
           if (err3 || studentRows.length === 0) {
             completed++;
@@ -104,9 +103,9 @@ router.post("/", authMiddleware, requireRole("faculty", "admin"), (req, res) => 
 
           const studentId = studentRows[0].id;
 
-          // Insert or update marks in cia_marks_new
           db.query(
-            `INSERT INTO cia_marks_new (student_id, course_id, cia_component_id, usn, student_name, marks_obtained, entered_by)
+            `INSERT INTO cia_marks_new
+               (student_id, course_id, cia_component_id, usn, student_name, marks_obtained, entered_by)
              VALUES (?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained)`,
             [studentId, courseId, ciaId, student.usn, student.name, student.total, req.user?.id || 1],
