@@ -1,149 +1,221 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStudentMarks } from "../../store/slices/marksSlice";
+import Courses from "./Courses";
 
-const PASS = 40; // 40% passing threshold
+const MAX = 30;
+const PASS = 15;
 
 export default function StudentDashboard() {
   const dispatch = useDispatch();
-  const { user }  = useSelector((s) => s.auth);
+  const { user } = useSelector((s) => s.auth);
   const { studentMarks, loading } = useSelector((s) => s.marks);
+  const [view, setView] = useState("marks");
 
   useEffect(() => {
     if (user?.usn) dispatch(fetchStudentMarks(user.usn));
-  }, [user, dispatch]);
+  }, [dispatch, user]);
 
-  // Support both field names: total (old) and marks_obtained (new)
-  const getMarks   = (m) => Number(m.marks_obtained ?? m.total ?? 0);
-  const getMax     = (m) => Number(m.max_marks ?? 30);
-  const getPercent = (m) => {
-    const max = getMax(m);
-    return max > 0 ? ((getMarks(m) / max) * 100).toFixed(1) : '0.0';
-  };
-
-  const totalSubjects = studentMarks.length;
-  const passed = studentMarks.filter((m) => parseFloat(getPercent(m)) >= PASS).length;
-  const avgPct = totalSubjects > 0
-    ? (studentMarks.reduce((acc, m) => acc + parseFloat(getPercent(m)), 0) / totalSubjects).toFixed(1)
-    : 0;
-
-  const getColor = (pct) => {
-    if (pct >= 70) return "#660000";
-    if (pct >= 40) return "#8B0000";
-    return "#4d0000";
-  };
+  const tabs = [
+    { id: "marks",   label: "📊 My CIA Marks" },
+    { id: "courses", label: "📚 My Courses"   },
+    { id: "profile", label: "👤 My Profile"   },
+  ];
 
   return (
     <div className="container">
-      {/* Welcome */}
       <div className="welcome-card">
-        <h1>Welcome, {user?.name}! 👋</h1>
-        <p>View your Continuous Internal Assessment marks below.</p>
+        <h1>Student Portal 🎓</h1>
+        <p>
+          Welcome, <strong>{user?.name}</strong>.
+          {user?.programme && <> &nbsp;|&nbsp; Programme: <strong>{user.programme}</strong></>}
+          {user?.usn       && <> &nbsp;|&nbsp; USN: <strong>{user.usn}</strong></>}
+        </p>
       </div>
 
-      {/* Student Info */}
-      <div className="card">
-        <h2 style={{ color: "#800000", marginBottom: 16 }}>Student Information</h2>
-        <div className="info-grid">
-          <div className="info-item">
-            <div className="info-item-label">USN</div>
-            <div className="info-item-value">{user?.usn || "—"}</div>
-          </div>
-          <div className="info-item">
-            <div className="info-item-label">Programme</div>
-            <div className="info-item-value">{user?.programme || "—"}</div>
-          </div>
-          <div className="info-item">
-            <div className="info-item-label">Semester</div>
-            <div className="info-item-value">{user?.semester || "—"}</div>
-          </div>
-          <div className="info-item">
-            <div className="info-item-label">Email</div>
-            <div className="info-item-value" style={{ fontSize: 13 }}>{user?.email}</div>
-          </div>
+      <div className="tab-bar">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            className={`tab-btn ${view === t.id ? "active" : ""}`}
+            onClick={() => setView(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "marks"   && <MarksView marks={studentMarks} loading={loading} />}
+      {view === "courses" && <Courses />}
+      {view === "profile" && <ProfileView user={user} />}
+    </div>
+  );
+}
+
+/* ── Marks Tab ─────────────────────────────────────────────────── */
+function MarksView({ marks, loading }) {
+  if (loading) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: 60, color: "#800000" }}>
+        Loading your marks…
+      </div>
+    );
+  }
+
+  if (!marks || marks.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: 60, color: "#aaa" }}>
+        No marks entered yet. Check back after your faculty submits CIA marks.
+      </div>
+    );
+  }
+
+  // Group marks by course
+  const byCourse = marks.reduce((acc, m) => {
+    const key = m.course_name || m.course_id || "Unknown";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(m);
+    return acc;
+  }, {});
+
+  const totalMarks   = marks.reduce((s, m) => s + Number(m.marks_obtained || 0), 0);
+  const totalMax     = marks.length * MAX;
+  const overallPct   = totalMax > 0 ? Math.round((totalMarks / totalMax) * 100) : 0;
+  const passCount    = marks.filter((m) => Number(m.marks_obtained) >= PASS).length;
+  const failCount    = marks.length - passCount;
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2 style={{ color: "#800000" }}>📊 My CIA Marks</h2>
+        <span style={{ fontSize: 13, color: "#666" }}>
+          Overall: <strong style={{ color: "#800000" }}>{overallPct}%</strong>
+        </span>
+      </div>
+
+      {/* Summary stats */}
+      <div className="stats-grid" style={{ marginBottom: 24 }}>
+        <div className="stat-card">
+          <div className="stat-value">{marks.length}</div>
+          <div className="stat-label">Total Assessments</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: "#2e7d32" }}>{passCount}</div>
+          <div className="stat-label">Passed</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: "#c62828" }}>{failCount}</div>
+          <div className="stat-label">Failed</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">{overallPct}%</div>
+          <div className="stat-label">Overall %</div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="stats-grid">
-        <div className="stat-card"><div className="stat-value">{totalSubjects}</div><div className="stat-label">Total Assessments</div></div>
-        <div className="stat-card"><div className="stat-value">{avgPct}%</div><div className="stat-label">Average Percentage</div></div>
-        <div className="stat-card"><div className="stat-value">{passed}</div><div className="stat-label">Passed</div></div>
-        <div className="stat-card"><div className="stat-value">{totalSubjects - passed}</div><div className="stat-label">Failed</div></div>
+      {/* Per-course breakdown */}
+      {Object.entries(byCourse).map(([course, courseMarks]) => {
+        const cTotal = courseMarks.reduce((s, m) => s + Number(m.marks_obtained || 0), 0);
+        const cMax   = courseMarks.length * MAX;
+        const cPct   = cMax > 0 ? Math.round((cTotal / cMax) * 100) : 0;
+
+        return (
+          <div key={course} style={{ marginBottom: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between",
+                          alignItems: "center", marginBottom: 10 }}>
+              <h3 style={{ color: "#800000", fontSize: 15 }}>{course}</h3>
+              <span style={{ fontSize: 13, color: "#555" }}>
+                {cTotal}/{cMax} &nbsp;({cPct}%)
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ height: 8, background: "#f0e0e0", borderRadius: 4, marginBottom: 12 }}>
+              <div style={{
+                height: "100%", borderRadius: 4,
+                width: `${cPct}%`,
+                background: cPct >= 50 ? "#2e7d32" : "#c62828",
+                transition: "width 0.4s",
+              }} />
+            </div>
+
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>CIA Component</th>
+                    <th style={{ textAlign: "center" }}>Marks</th>
+                    <th style={{ textAlign: "center" }}>Max</th>
+                    <th style={{ textAlign: "center" }}>%</th>
+                    <th style={{ textAlign: "center" }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courseMarks.map((m, i) => {
+                    const mo  = Number(m.marks_obtained || 0);
+                    const pct = Math.round((mo / MAX) * 100);
+                    const pass = mo >= PASS;
+                    return (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 500 }}>
+                          {m.cia_type || m.type || `CIA-${i + 1}`}
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <strong style={{ color: pass ? "#2e7d32" : "#c62828" }}>{mo}</strong>
+                        </td>
+                        <td style={{ textAlign: "center", color: "#888" }}>{MAX}</td>
+                        <td style={{ textAlign: "center" }}>{pct}%</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span style={{
+                            background: pass ? "#e6f4ea" : "#fce8e8",
+                            color:      pass ? "#2e7d32" : "#c62828",
+                            padding: "2px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                          }}>
+                            {pass ? "Pass" : "Fail"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Profile Tab ───────────────────────────────────────────────── */
+function ProfileView({ user }) {
+  const fields = [
+    { label: "Full Name",   value: user?.name },
+    { label: "Email",       value: user?.email },
+    { label: "USN",         value: user?.usn },
+    { label: "Programme",   value: user?.programme },
+    { label: "Semester",    value: user?.semester },
+    { label: "Role",        value: user?.role },
+  ];
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2 style={{ color: "#800000" }}>👤 My Profile</h2>
       </div>
 
-      {/* Marks Table */}
-      <div className="card">
-        <div className="card-header">
-          <h2 style={{ color: "#800000" }}>My CIA Marks</h2>
-          <span style={{ fontSize: 13, color: "#666" }}>Pass threshold: {PASS}%</span>
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: "#800000" }}>Loading marks...</div>
-        ) : totalSubjects === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: "#999" }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-            <div>No marks entered yet. Please check back after your faculty enters marks.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 480 }}>
+        {fields.map(({ label, value }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center",
+                                    borderBottom: "1px solid #f5e0e0", paddingBottom: 12 }}>
+            <span style={{ width: 140, fontSize: 13, color: "#888", fontWeight: 600 }}>
+              {label}
+            </span>
+            <span style={{ fontSize: 14, color: "#333", fontWeight: 500 }}>
+              {value || "—"}
+            </span>
           </div>
-        ) : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Course Name</th>
-                  <th>CIA Type</th>
-                  <th style={{ textAlign: "center" }}>Marks</th>
-                  <th style={{ textAlign: "center" }}>Max</th>
-                  <th style={{ textAlign: "center" }}>Percentage</th>
-                  <th style={{ textAlign: "center" }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {studentMarks.map((m, i) => {
-                  const marks    = getMarks(m);
-                  const max      = getMax(m);
-                  const pct      = getPercent(m);
-                  const isPassed = parseFloat(pct) >= PASS;
-                  const color    = getColor(parseFloat(pct));
-                  return (
-                    <tr key={m.marks_id || m.id || i}>
-                      <td>{i + 1}</td>
-                      <td style={{ fontWeight: 600 }}>{m.course_name}</td>
-                      <td>
-                        <span style={{ background: '#fff5f5', color: '#8B0000', border: '1px solid rgba(139,0,0,0.3)', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-                          {m.cia_type || 'CIA'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <strong style={{ fontSize: 18, color }}>{marks}</strong>
-                      </td>
-                      <td style={{ textAlign: "center", color: "#666" }}>{max}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                          <div style={{ width: 60, height: 8, background: "#ffe4e4", borderRadius: 4, overflow: "hidden" }}>
-                            <div style={{ width: `${Math.min(parseFloat(pct), 100)}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.5s" }} />
-                          </div>
-                          <span style={{ fontSize: 13, color, fontWeight: 600 }}>{pct}%</span>
-                        </div>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <span className={isPassed ? "badge-pass" : "badge-fail"}>
-                          {isPassed ? "✅ Pass" : "❌ Fail"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div style={{ background: "#fff5f5", border: "1px solid #f0d0d0", borderLeft: "4px solid #800000", borderRadius: 8, padding: "14px 18px", fontSize: 13, color: "#800000" }}>
-        <strong>ℹ️ Note:</strong> Marks are entered by your faculty. For queries, contact your department.
+        ))}
       </div>
     </div>
   );
