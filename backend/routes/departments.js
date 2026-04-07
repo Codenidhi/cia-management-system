@@ -3,14 +3,9 @@ const router = express.Router();
 const db = require("../config/db");
 const { authMiddleware, requireRole } = require("../middleware/auth");
 
-// GET /api/departments
 router.get("/", authMiddleware, (req, res) => {
   db.query(
-    `SELECT 
-       id          AS department_id,
-       name        AS department_name,
-       hod         AS hod_name,
-       status
+    `SELECT id AS department_id, name AS department_name, hod AS hod_name, status
      FROM departments ORDER BY name`,
     (err, results) => {
       if (err) return res.status(500).json({ success: false, message: "DB error" });
@@ -19,36 +14,29 @@ router.get("/", authMiddleware, (req, res) => {
   );
 });
 
-// POST /api/departments
 router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
-  const { department_name, hod_name, status } = req.body;
-  const name = department_name || req.body.name;
-  const hod  = hod_name        || req.body.hod || null;
+  const name = req.body.department_name || req.body.name;
+  const hod  = req.body.hod_name || req.body.hod || null;
+  const status = req.body.status || "Active";
   if (!name) return res.status(400).json({ success: false, message: "Department name required" });
 
   db.query(
     "INSERT INTO departments (name, hod, status) VALUES (?, ?, ?)",
-    [name, hod, status || "Active"],
+    [name, hod, status],
     (err, result) => {
       if (err) return res.status(500).json({ success: false, message: "Error adding department" });
       res.json({
         success: true,
-        data: {
-          department_id:   result.insertId,
-          department_name: name,
-          hod_name:        hod || '',
-          status:          status || 'Active',
-        }
+        data: { department_id: result.insertId, department_name: name, hod_name: hod || '', status }
       });
     }
   );
 });
 
-// PUT /api/departments/:id
 router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
-  const { department_name, hod_name, status } = req.body;
-  const name = department_name || req.body.name;
-  const hod  = hod_name        || req.body.hod || null;
+  const name   = req.body.department_name || req.body.name;
+  const hod    = req.body.hod_name || req.body.hod || null;
+  const status = req.body.status || "Active"; // ← default to Active if not sent
 
   db.query(
     "UPDATE departments SET name=?, hod=?, status=? WHERE id=?",
@@ -57,18 +45,12 @@ router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
       if (err) return res.status(500).json({ success: false, message: "Error updating" });
       res.json({
         success: true,
-        data: {
-          department_id:   parseInt(req.params.id),
-          department_name: name,
-          hod_name:        hod || '',
-          status,
-        }
+        data: { department_id: parseInt(req.params.id), department_name: name, hod_name: hod || '', status }
       });
     }
   );
 });
 
-// DELETE /api/departments/:id
 router.delete("/:id", authMiddleware, requireRole("admin"), (req, res) => {
   db.query("DELETE FROM departments WHERE id=?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ success: false, message: "Error deleting" });
