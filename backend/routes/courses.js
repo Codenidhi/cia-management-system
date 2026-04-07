@@ -9,18 +9,35 @@ router.get("/", authMiddleware, (req, res) => {
 
   if (role === "faculty") {
     db.query("SELECT id FROM faculty WHERE email = ?", [email], (err, fac) => {
-      if (err) { console.error("faculty lookup:", err); return res.status(500).json({ success: false, message: "DB error" }); }
+      if (err) {
+        console.error("faculty lookup:", err);
+        return res.status(500).json({ success: false, message: "DB error" });
+      }
       if (!fac || fac.length === 0) return res.json({ success: true, data: [] });
+
       const facultyId = fac[0].id;
       db.query(
-        `SELECT c.id, c.course_name AS name, c.course_code AS code,
-                c.semester, c.programme_id, c.faculty_id,
-                p.name AS programme_name
-         FROM courses c LEFT JOIN programmes p ON c.programme_id = p.id
-         WHERE c.faculty_id = ? ORDER BY c.semester, c.course_name`,
+        `SELECT c.id,
+                c.course_name,
+                c.course_name   AS name,
+                c.course_code,
+                c.course_code   AS code,
+                c.semester,
+                c.programme_id,
+                c.faculty_id,
+                p.name          AS programme_name,
+                f.name          AS faculty_name
+         FROM courses c
+         LEFT JOIN programmes p ON c.programme_id = p.id
+         LEFT JOIN faculty    f ON c.faculty_id   = f.id
+         WHERE c.faculty_id = ?
+         ORDER BY c.semester, c.course_name`,
         [facultyId],
         (err2, results) => {
-          if (err2) { console.error("faculty courses:", err2); return res.status(500).json({ success: false, message: "DB error" }); }
+          if (err2) {
+            console.error("faculty courses:", err2);
+            return res.status(500).json({ success: false, message: "DB error" });
+          }
           return res.json({ success: true, data: results || [] });
         }
       );
@@ -31,31 +48,53 @@ router.get("/", authMiddleware, (req, res) => {
   if (role === "student") {
     const progId = req.user.programme_id || null;
     if (!progId) return res.json({ success: true, data: [] });
+
     db.query(
-      `SELECT c.id, c.course_name AS name, c.course_code AS code,
-              c.semester, c.programme_id, p.name AS programme_name
-       FROM courses c LEFT JOIN programmes p ON c.programme_id = p.id
-       WHERE c.programme_id = ? ORDER BY c.semester, c.course_name`,
+      `SELECT c.id,
+              c.course_name,
+              c.course_name   AS name,
+              c.course_code,
+              c.course_code   AS code,
+              c.semester,
+              c.programme_id,
+              p.name          AS programme_name
+       FROM courses c
+       LEFT JOIN programmes p ON c.programme_id = p.id
+       WHERE c.programme_id = ?
+       ORDER BY c.semester, c.course_name`,
       [progId],
       (err, results) => {
-        if (err) { console.error("student courses:", err); return res.status(500).json({ success: false, message: "DB error" }); }
+        if (err) {
+          console.error("student courses:", err);
+          return res.status(500).json({ success: false, message: "DB error" });
+        }
         return res.json({ success: true, data: results || [] });
       }
     );
     return;
   }
 
-  // Admin
+  // Admin — all courses
   db.query(
-    `SELECT c.id, c.course_name AS name, c.course_code AS code,
-            c.semester, c.programme_id, c.faculty_id,
-            p.name AS programme_name, f.name AS faculty_name
+    `SELECT c.id,
+            c.course_name,
+            c.course_name   AS name,
+            c.course_code,
+            c.course_code   AS code,
+            c.semester,
+            c.programme_id,
+            c.faculty_id,
+            p.name          AS programme_name,
+            f.name          AS faculty_name
      FROM courses c
      LEFT JOIN programmes p ON c.programme_id = p.id
-     LEFT JOIN faculty f ON c.faculty_id = f.id
+     LEFT JOIN faculty    f ON c.faculty_id   = f.id
      ORDER BY p.name, c.semester, c.course_name`,
     (err, results) => {
-      if (err) { console.error("admin courses:", err); return res.status(500).json({ success: false, message: "DB error" }); }
+      if (err) {
+        console.error("admin courses:", err);
+        return res.status(500).json({ success: false, message: "DB error" });
+      }
       return res.json({ success: true, data: results || [] });
     }
   );
@@ -65,13 +104,44 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
   const name = req.body.course_name || req.body.name;
   const code = req.body.course_code || req.body.code || null;
   const { semester, programme_id, faculty_id } = req.body;
-  if (!name) return res.status(400).json({ success: false, message: "Course name required" });
+
+  if (!name)
+    return res.status(400).json({ success: false, message: "Course name required" });
+
   db.query(
     "INSERT INTO courses (course_name, course_code, semester, programme_id, faculty_id) VALUES (?,?,?,?,?)",
     [name, code, semester || 1, programme_id || null, faculty_id || null],
     (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: "Error adding course" });
-      res.json({ success: true, data: { id: result.insertId, name, code, semester, programme_id, faculty_id } });
+      if (err)
+        return res.status(500).json({ success: false, message: "Error adding course" });
+
+      // Fetch back full row so frontend gets all fields
+      db.query(
+        `SELECT c.id,
+                c.course_name,
+                c.course_name AS name,
+                c.course_code,
+                c.course_code AS code,
+                c.semester,
+                c.programme_id,
+                c.faculty_id,
+                p.name        AS programme_name,
+                f.name        AS faculty_name
+         FROM courses c
+         LEFT JOIN programmes p ON c.programme_id = p.id
+         LEFT JOIN faculty    f ON c.faculty_id   = f.id
+         WHERE c.id = ?`,
+        [result.insertId],
+        (err2, rows) => {
+          if (err2 || rows.length === 0) {
+            return res.json({
+              success: true,
+              data: { id: result.insertId, course_name: name, name, course_code: code, code, semester, programme_id, faculty_id },
+            });
+          }
+          res.json({ success: true, data: rows[0] });
+        }
+      );
     }
   );
 });
@@ -80,6 +150,7 @@ router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
   const name = req.body.course_name || req.body.name;
   const code = req.body.course_code || req.body.code || null;
   const { semester, programme_id, faculty_id } = req.body;
+
   db.query(
     "UPDATE courses SET course_name=?, course_code=?, semester=?, programme_id=?, faculty_id=? WHERE id=?",
     [name, code, semester, programme_id || null, faculty_id || null, req.params.id],
