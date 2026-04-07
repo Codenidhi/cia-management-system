@@ -77,7 +77,7 @@ const CIAReportsContent = () => {
         <td style="padding:9px 14px;border:1px solid #ddd;text-align:center">${m.max_marks}</td>
         <td style="padding:9px 14px;border:1px solid #ddd;text-align:center">${pct}%</td>
         <td style="padding:9px 14px;border:1px solid #ddd;text-align:center">
-          <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;background:${ok ? '#fff5f5' : '#ffe4e4'};color:${ok ? '#660000' : '#4d0000'}">${ok ? 'PASS' : 'FAIL'}</span>
+          <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;background:${ok ? '#e6f4ea' : '#fce8e8'};color:${ok ? '#2e7d32' : '#c62828'}">${ok ? 'PASS' : 'FAIL'}</span>
         </td></tr>`;
     }).join('');
 
@@ -87,11 +87,11 @@ const CIAReportsContent = () => {
 <div class="hdr"><div><h1>🎓 CIA Management System</h1><p><strong>${title}</strong> | Pass threshold: ${passPercentage}% | Filter: ${filterNote}</p></div><div class="meta"><div>Generated on</div><div><strong>${new Date().toLocaleString()}</strong></div></div></div>
 <div class="stats">
   <div class="stat" style="border-left:4px solid ${color}"><div class="val" style="color:${color}">${subset.length}</div><div class="lbl">Records</div></div>
-  <div class="stat" style="border-left:4px solid #8B0000"><div class="val" style="color:#8B0000">${passed.length}</div><div class="lbl">Passed</div></div>
-  <div class="stat" style="border-left:4px solid #660000"><div class="val" style="color:#660000">${failed.length}</div><div class="lbl">Failed</div></div>
-  <div class="stat" style="border-left:4px solid #4d0000"><div class="val" style="color:#4d0000">${passRate}%</div><div class="lbl">Pass Rate</div></div>
+  <div class="stat" style="border-left:4px solid #2e7d32"><div class="val" style="color:#2e7d32">${passed.length}</div><div class="lbl">Passed</div></div>
+  <div class="stat" style="border-left:4px solid #c62828"><div class="val" style="color:#c62828">${failed.length}</div><div class="lbl">Failed</div></div>
+  <div class="stat" style="border-left:4px solid #1565c0"><div class="val" style="color:#1565c0">${passRate}%</div><div class="lbl">Pass Rate</div></div>
 </div>
-<table><thead><tr><th>id</th><th>USN</th><th>Student Name</th><th>Course</th><th>CIA Type</th><th style="text-align:center">Marks</th><th style="text-align:center">Max</th><th style="text-align:center">%</th><th style="text-align:center">Result</th></tr></thead>
+<table><thead><tr><th>#</th><th>USN</th><th>Student Name</th><th>Course</th><th>CIA Type</th><th style="text-align:center">Marks</th><th style="text-align:center">Max</th><th style="text-align:center">%</th><th style="text-align:center">Result</th></tr></thead>
 <tbody>${rows}</tbody></table>
 <div class="footer">CIA Management System • Confidential Academic Record</div>
 <script>window.onload=()=>window.print()<\/script></body></html>`);
@@ -108,11 +108,11 @@ const CIAReportsContent = () => {
     return (
       <div className="table-container">
         <table className="data-table">
-          <thead><tr><th>id</th><th>USN</th><th>Student Name</th><th>Course</th><th>CIA Type</th><th>Marks</th><th>Max</th><th>Percentage</th><th>Result</th></tr></thead>
+          <thead><tr><th>#</th><th>USN</th><th>Student Name</th><th>Course</th><th>CIA Type</th><th>Marks</th><th>Max</th><th>Percentage</th><th>Result</th></tr></thead>
           <tbody>{rows.map((m, idx) => {
             const pct = m.max_marks > 0 ? ((m.marks_obtained / m.max_marks) * 100).toFixed(1) : '0.0';
             return (
-              <tr key={m.marks_id}>
+              <tr key={m.marks_id || idx}>
                 <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
                 <td className="font-mono">{m.usn || '-'}</td>
                 <td className="font-bold">{m.student_name || '-'}</td>
@@ -150,8 +150,8 @@ const CIAReportsContent = () => {
         <h2>CIA Reports</h2>
         <div className="cia-header-actions">
           <button className="cia-dl-btn cia-dl-all"    onClick={() => openPDF(filtered, 'All Results',     '#8B0000')}><Download size={15} /> All (PDF)</button>
-          <button className="cia-dl-btn cia-dl-passed" onClick={() => openPDF(passed,   'Passed Students', '#660000')}><Download size={15} /> Passed (PDF)</button>
-          <button className="cia-dl-btn cia-dl-failed" onClick={() => openPDF(failed,   'Failed Students', '#4d0000')}><Download size={15} /> Failed (PDF)</button>
+          <button className="cia-dl-btn cia-dl-passed" onClick={() => openPDF(passed,   'Passed Students', '#2e7d32')}><Download size={15} /> Passed (PDF)</button>
+          <button className="cia-dl-btn cia-dl-failed" onClick={() => openPDF(failed,   'Failed Students', '#c62828')}><Download size={15} /> Failed (PDF)</button>
         </div>
       </div>
 
@@ -192,7 +192,7 @@ const CIAReportsContent = () => {
       </div>
 
       {marks.length === 0 ? (
-        <div className="cia-empty-state cia-empty-neutral">No marks data found. Add marks from the <strong>CIA Marks</strong> tab.</div>
+        <div className="cia-empty-state cia-empty-neutral">No marks data found. Faculty can enter marks from their dashboard.</div>
       ) : (
         <>
           {(activeView === 'both' || activeView === 'passed') && (
@@ -331,13 +331,13 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fDepts.length === 0 ? <EmptyState message="No departments found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>Name</th><th>HOD</th><th>Status</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>HOD</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>{fDepts.map((d, idx) => (
                     <tr key={d.department_id}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
                       <td className="font-bold">{d.department_name}</td>
                       <td>{d.hod_name || '-'}</td>
-                      <td><span className={`badge badge-${d.status === 'Active' ? 'success' : 'inactive'}`}>{d.status}</span></td>
+                      <td><span className={`badge badge-${d.status === 'Active' ? 'success' : 'inactive'}`}>{d.status || 'Active'}</span></td>
                       <td>
                         <button className="edit-btn" onClick={() => dispatch(openEditModal({ entityType: 'department', data: d }))}><Pencil size={13} /> Edit</button>
                         <button className="delete-btn" onClick={() => handleDelete(deleteDepartment, d.department_id, 'Department')}>Delete</button>
@@ -367,15 +367,15 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fProgs.length === 0 ? <EmptyState message="No programmes found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>Name</th><th>Department</th><th>Duration</th><th>Total Semesters</th><th>Status</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Department</th><th>Duration</th><th>Semesters</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>{fProgs.map((p, idx) => (
                     <tr key={p.programme_id}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
                       <td className="font-bold">{p.programme_name}</td>
                       <td>{p.department_name || '-'}</td>
-                      <td>{p.duration} years</td>
+                      <td>{p.duration} yrs</td>
                       <td>{p.total_semesters}</td>
-                      <td><span className={`badge badge-${p.status === 'Active' ? 'success' : 'inactive'}`}>{p.status}</span></td>
+                      <td><span className={`badge badge-${p.status === 'Active' ? 'success' : 'inactive'}`}>{p.status || 'Active'}</span></td>
                       <td>
                         <button className="edit-btn" onClick={() => dispatch(openEditModal({ entityType: 'programme', data: p }))}><Pencil size={13} /> Edit</button>
                         <button className="delete-btn" onClick={() => handleDelete(deleteProgramme, p.programme_id, 'Programme')}>Delete</button>
@@ -405,7 +405,7 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fStuds.length === 0 ? <EmptyState message="No students found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>USN</th><th>Name</th><th>Programme</th><th>Semester</th><th>Email</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>USN</th><th>Name</th><th>Programme</th><th>Semester</th><th>Email</th><th>Actions</th></tr></thead>
                   <tbody>{fStuds.map((s, idx) => (
                     <tr key={s.student_id}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
@@ -440,7 +440,7 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fFac.length === 0 ? <EmptyState message="No faculty members found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Designation</th><th>Department</th><th>Email</th><th>Actions</th></tr></thead>
                   <tbody>{fFac.map((f, idx) => (
                     <tr key={f.faculty_id}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
@@ -477,11 +477,11 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fCours.length === 0 ? <EmptyState message="No courses found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>Code</th><th>Name</th><th>Programme</th><th>Semester</th><th>Faculty</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Programme</th><th>Semester</th><th>Faculty</th><th>Actions</th></tr></thead>
                   <tbody>{fCours.map((c, idx) => (
-                    <tr key={c.course_id}>
+                    <tr key={c.course_id || idx}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
-                      <td>{c.course_code}</td>
+                      <td>{c.course_code || '-'}</td>
                       <td className="font-bold">{c.course_name}</td>
                       <td>{c.programme_name || '-'}</td>
                       <td>Sem {c.semester}</td>
@@ -506,7 +506,7 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fCIA.length === 0 ? <EmptyState message="No CIA components found." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>Type</th><th>Max Marks</th><th>Weightage</th><th>Assessment Type</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>Type</th><th>Max Marks</th><th>Weightage</th><th>Assessment Type</th><th>Actions</th></tr></thead>
                   <tbody>{fCIA.map((c, idx) => (
                     <tr key={c.cia_id}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
@@ -540,9 +540,9 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
               {fMarks.length === 0 ? <EmptyState message="No marks entered yet. Faculty can enter marks from their dashboard." /> : (
                 <div className="table-container"><table className="data-table">
-                  <thead><tr><th>id</th><th>USN</th><th>Student</th><th>Course</th><th>CIA Type</th><th>Marks</th><th>Max</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>#</th><th>USN</th><th>Student</th><th>Course</th><th>CIA Type</th><th>Marks</th><th>Max</th><th>Actions</th></tr></thead>
                   <tbody>{fMarks.map((m, idx) => (
-                    <tr key={m.marks_id}>
+                    <tr key={m.marks_id || idx}>
                       <td style={{ color: '#999', fontWeight: 500 }}>{idx + 1}</td>
                       <td className="font-mono">{m.usn}</td>
                       <td className="font-bold">{m.student_name}</td>
@@ -581,16 +581,31 @@ const AdminDashboard = ({ onLogout }) => {
 //  FORM MODAL
 // ═══════════════════════════════════════════════════════
 const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
-                     departments, programmes, faculty, students, courses, ciaComponents }) => {
+                     departments, programmes, faculty }) => {
   const dispatch = useDispatch();
   const isEdit   = mode === 'edit';
 
   const seed = () => {
     if (!isEdit || !initialData) return {};
-    if (entityType === 'department')    return { department_name: initialData.department_name, hod_name: initialData.hod_name || '' };
-    if (entityType === 'programme')     return { programme_name: initialData.programme_name, department_id: initialData.department_id, duration: initialData.duration, total_semesters: initialData.total_semesters };
-    if (entityType === 'cia-component') return { cia_type: initialData.cia_type, max_marks: initialData.max_marks, weightage: initialData.weightage, assessment_type: initialData.assessment_type };
-    if (entityType === 'marks')         return { marks_obtained: initialData.marks_obtained };
+    if (entityType === 'department')    return {
+      department_name: initialData.department_name,
+      hod_name:        initialData.hod_name || '',
+      status:          initialData.status   || 'Active',
+    };
+    if (entityType === 'programme')     return {
+      programme_name:   initialData.programme_name,
+      department_id:    initialData.department_id,
+      duration:         initialData.duration,
+      total_semesters:  initialData.total_semesters,
+      status:           initialData.status || 'Active',
+    };
+    if (entityType === 'cia-component') return {
+      cia_type:        initialData.cia_type,
+      max_marks:       initialData.max_marks,
+      weightage:       initialData.weightage,
+      assessment_type: initialData.assessment_type,
+    };
+    if (entityType === 'marks') return { marks_obtained: initialData.marks_obtained };
     return {};
   };
 
@@ -626,8 +641,8 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
         await dispatch(updateCIAComponent({ id: initialData.cia_id, data: formData })).unwrap();
         onSuccess('CIA Component updated successfully!'); return;
       }
-      if (entityType === 'student') { await dispatch(addStudent(formData)).unwrap(); onSuccess('Student added successfully!'); return; }
-      if (entityType === 'faculty') { await dispatch(addFaculty(formData)).unwrap(); onSuccess('Faculty added successfully!'); return; }
+      if (entityType === 'student') { await dispatch(addStudent(formData)).unwrap(); onSuccess('Student added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'student123')); return; }
+      if (entityType === 'faculty') { await dispatch(addFaculty(formData)).unwrap(); onSuccess('Faculty added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'faculty123')); return; }
       if (entityType === 'course')  { await dispatch(addCourse(formData)).unwrap();  onSuccess('Course added successfully!');  return; }
       onError('Unknown entity type');
     } catch (err) { onError('Error: ' + (err.message || err)); }
@@ -641,61 +656,100 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header"><h2>{label}</h2><button className="close-btn" onClick={onClose}><X size={24} /></button></div>
         <form onSubmit={handleSubmit}>
+
+          {/* ── DEPARTMENT ── */}
           {entityType === 'department' && (<>
-            <div className="form-group"><label>Department Name *</label><input type="text" name="department_name" required onChange={hc} defaultValue={formData.department_name} placeholder="e.g., Computer Science" /></div>
-            <div className="form-group"><label>HOD Name</label><input type="text" name="hod_name" onChange={hc} defaultValue={formData.hod_name} placeholder="e.g., Dr. John Doe" /></div>
+            <div className="form-group"><label>Department Name *</label>
+              <input type="text" name="department_name" required onChange={hc} defaultValue={formData.department_name} placeholder="e.g., Computer Science" /></div>
+            <div className="form-group"><label>HOD Name</label>
+              <input type="text" name="hod_name" onChange={hc} defaultValue={formData.hod_name} placeholder="e.g., Dr. John Doe" /></div>
+            <div className="form-group"><label>Status</label>
+              <select name="status" onChange={hc} defaultValue={formData.status || 'Active'}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select></div>
           </>)}
+
+          {/* ── PROGRAMME ── */}
           {entityType === 'programme' && (<>
-            <div className="form-group"><label>Programme Name *</label><input type="text" name="programme_name" required onChange={hc} defaultValue={formData.programme_name} placeholder="e.g., MCA" /></div>
+            <div className="form-group"><label>Programme Name *</label>
+              <input type="text" name="programme_name" required onChange={hc} defaultValue={formData.programme_name} placeholder="e.g., MCA" /></div>
             <div className="form-group"><label>Department *</label>
               <select name="department_id" required onChange={hc} defaultValue={formData.department_id}>
                 <option value="">Select Department</option>
                 {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
               </select></div>
-            <div className="form-group"><label>Duration (years) *</label><input type="number" name="duration" required onChange={hc} defaultValue={formData.duration} min="1" /></div>
-            <div className="form-group"><label>Total Semesters *</label><input type="number" name="total_semesters" required onChange={hc} defaultValue={formData.total_semesters} min="1" /></div>
+            <div className="form-group"><label>Duration (years) *</label>
+              <input type="number" name="duration" required onChange={hc} defaultValue={formData.duration} min="1" /></div>
+            <div className="form-group"><label>Total Semesters *</label>
+              <input type="number" name="total_semesters" required onChange={hc} defaultValue={formData.total_semesters} min="1" /></div>
+            <div className="form-group"><label>Status</label>
+              <select name="status" onChange={hc} defaultValue={formData.status || 'Active'}>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select></div>
           </>)}
+
+          {/* ── COURSE ── */}
           {entityType === 'course' && (<>
-            <div className="form-group"><label>Course Code *</label><input type="text" name="course_code" required onChange={hc} placeholder="e.g., CS101" /></div>
-            <div className="form-group"><label>Course Name *</label><input type="text" name="course_name" required onChange={hc} placeholder="e.g., Data Structures" /></div>
+            <div className="form-group"><label>Course Code *</label>
+              <input type="text" name="course_code" required onChange={hc} placeholder="e.g., CS101" /></div>
+            <div className="form-group"><label>Course Name *</label>
+              <input type="text" name="course_name" required onChange={hc} placeholder="e.g., Data Structures" /></div>
             <div className="form-group"><label>Programme *</label>
               <select name="programme_id" required onChange={hc}>
                 <option value="">Select Programme</option>
                 {programmes.map(p => <option key={p.programme_id} value={p.programme_id}>{p.programme_name}</option>)}
               </select></div>
-            <div className="form-group"><label>Semester *</label><input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
+            <div className="form-group"><label>Semester *</label>
+              <input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
             <div className="form-group"><label>Faculty</label>
               <select name="faculty_id" onChange={hc}>
                 <option value="">Select Faculty</option>
                 {faculty.map(f => <option key={f.faculty_id} value={f.faculty_id}>{f.faculty_name}</option>)}
               </select></div>
           </>)}
+
+          {/* ── CIA COMPONENT ── */}
           {entityType === 'cia-component' && (<>
-            <div className="form-group"><label>CIA Type *</label><input type="text" name="cia_type" required onChange={hc} defaultValue={formData.cia_type} /></div>
-            <div className="form-group"><label>Max Marks *</label><input type="number" name="max_marks" required onChange={hc} defaultValue={formData.max_marks} min="1" max="100" /></div>
-            <div className="form-group"><label>Weightage (%)</label><input type="number" name="weightage" onChange={hc} defaultValue={formData.weightage} min="0" max="100" step="0.5" /></div>
+            <div className="form-group"><label>CIA Type *</label>
+              <input type="text" name="cia_type" required onChange={hc} defaultValue={formData.cia_type} /></div>
+            <div className="form-group"><label>Max Marks *</label>
+              <input type="number" name="max_marks" required onChange={hc} defaultValue={formData.max_marks} min="1" max="100" /></div>
+            <div className="form-group"><label>Weightage (%)</label>
+              <input type="number" name="weightage" onChange={hc} defaultValue={formData.weightage} min="0" max="100" step="0.5" /></div>
             <div className="form-group"><label>Assessment Type *</label>
               <select name="assessment_type" required onChange={hc} defaultValue={formData.assessment_type}>
                 <option value="">Select Type</option>
                 {['Written','Practical','Assignment','Project','Quiz','Test','Presentation','Viva'].map(t => <option key={t} value={t}>{t}</option>)}
               </select></div>
           </>)}
+
+          {/* ── STUDENT ── */}
           {entityType === 'student' && (<>
-            <div className="form-group"><label>Full Name *</label><input type="text" name="student_name" required onChange={hc} placeholder="e.g., Ravi Kumar" /></div>
-            <div className="form-group"><label>USN *</label><input type="text" name="usn" required onChange={hc} placeholder="e.g., 1CA24MC001" /></div>
-            <div className="form-group"><label>Date of Birth</label><input type="date" name="dob" onChange={hc} /></div>
-            <div className="form-group"><label>Email</label><input type="email" name="email" onChange={hc} placeholder="e.g., ravi@student.edu" /></div>
+            <div className="form-group"><label>Full Name *</label>
+              <input type="text" name="student_name" required onChange={hc} placeholder="e.g., Ravi Kumar" /></div>
+            <div className="form-group"><label>USN *</label>
+              <input type="text" name="usn" required onChange={hc} placeholder="e.g., 1CA24MC001" /></div>
+            <div className="form-group"><label>Email *</label>
+              <input type="email" name="email" required onChange={hc} placeholder="e.g., ravi@student.edu" /></div>
             <div className="form-group"><label>Programme *</label>
               <select name="programme_id" required onChange={hc}>
                 <option value="">Select Programme</option>
                 {programmes.map(p => <option key={p.programme_id} value={p.programme_id}>{p.programme_name}</option>)}
               </select></div>
-            <div className="form-group"><label>Semester *</label><input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
-            <div className="form-group"><label>Password *</label><input type="password" name="password" required onChange={hc} placeholder="Set login password" /></div>
+            <div className="form-group"><label>Semester *</label>
+              <input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
+            <div className="form-group"><label>Password *</label>
+              <input type="password" name="password" required onChange={hc} placeholder="Set login password" /></div>
           </>)}
+
+          {/* ── FACULTY ── */}
           {entityType === 'faculty' && (<>
-            <div className="form-group"><label>Full Name *</label><input type="text" name="faculty_name" required onChange={hc} placeholder="e.g., Dr. Priya Sharma" /></div>
-            <div className="form-group"><label>Email *</label><input type="email" name="email" required onChange={hc} placeholder="e.g., priya@college.edu" /></div>
+            <div className="form-group"><label>Full Name *</label>
+              <input type="text" name="faculty_name" required onChange={hc} placeholder="e.g., Dr. Priya Sharma" /></div>
+            <div className="form-group"><label>Email *</label>
+              <input type="email" name="email" required onChange={hc} placeholder="e.g., priya@college.edu" /></div>
             <div className="form-group"><label>Designation *</label>
               <select name="designation" required onChange={hc}>
                 <option value="">Select Designation</option>
@@ -706,8 +760,11 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
                 <option value="">Select Department</option>
                 {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
               </select></div>
-            <div className="form-group"><label>Password *</label><input type="password" name="password" required onChange={hc} placeholder="Set login password" /></div>
+            <div className="form-group"><label>Password *</label>
+              <input type="password" name="password" required onChange={hc} placeholder="Set login password" /></div>
           </>)}
+
+          {/* ── MARKS EDIT ── */}
           {entityType === 'marks' && isEdit && (
             <div className="form-group">
               <label>Marks Obtained * <small style={{ color: '#b08080' }}>(Max: {initialData.max_marks})</small></label>
@@ -717,6 +774,7 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
               </small>
             </div>
           )}
+
           <div className="form-actions">
             <button type="button" className="cancel-btn" onClick={onClose} disabled={submitting}>Cancel</button>
             <button type="submit" className="submit-btn" disabled={submitting}>
