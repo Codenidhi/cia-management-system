@@ -44,7 +44,7 @@ export default function CIAMarks() {
         const list = r.data.data || [];
         setStudents(list);
         const m = {};
-        list.forEach((s) => (m[s.id] = ""));
+        list.forEach((s) => (m[s.student_id || s.id || s.usn] = ""));
         setMarks(m);
       })
       .catch(() => setError("Could not load students"))
@@ -64,8 +64,8 @@ export default function CIAMarks() {
       return;
     }
     const entries = students
-      .filter((s) => marks[s.id] !== "" && marks[s.id] !== undefined)
-      .map((s) => ({ student_id: s.id, marks_obtained: Number(marks[s.id]) }));
+      .filter((s) => marks[s.student_id || s.id || s.usn] !== "" && marks[s.student_id || s.id || s.usn] !== undefined)
+      .map((s) => ({ student_id: s.student_id || s.id, marks_obtained: Number(marks[s.student_id || s.id || s.usn]) }));
 
     if (entries.length === 0) { setSaveMsg("⚠️ No marks entered."); return; }
 
@@ -159,11 +159,11 @@ export default function CIAMarks() {
               </thead>
               <tbody>
                 {students.map((s, i) => {
-                  const val  = marks[s.id];
+                  const val  = marks[s.student_id || s.id || s.usn];
                   const num  = val !== "" && val !== undefined ? Number(val) : null;
                   const pass = num !== null ? num >= PASS : null;
                   return (
-                    <tr key={s.id}>
+                    <tr key={s.student_id || s.id || s.usn}>
                       <td style={{ color: "#999" }}>{i + 1}</td>
                       <td><strong style={{ color: "#800000" }}>{s.usn}</strong></td>
                       <td style={{ fontWeight: 500 }}>{s.name || s.student_name}</td>
@@ -171,7 +171,7 @@ export default function CIAMarks() {
                       <td style={{ textAlign: "center" }}>{s.semester}</td>
                       <td style={{ textAlign: "center" }}>
                         <input type="number" min={0} max={MAX_MARKS} value={val ?? ""}
-                          onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          onChange={(e) => setMarks((prev) => ({ ...prev, [s.student_id || s.id || s.usn]: e.target.value }))}
                           style={{ width: 70, textAlign: "center", padding: "6px 8px", borderRadius: 6, border: "1.5px solid #ddd", fontSize: 14 }}
                           placeholder="—" />
                       </td>

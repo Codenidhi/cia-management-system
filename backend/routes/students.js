@@ -1,129 +1,125 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+const { authMiddleware, requireRole } = require("../middleware/auth");
 
-const StudentList = () => {
-  const [students, setStudents] = useState([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+// GET /api/students
+router.get("/", authMiddleware, (req, res) => {
+  const courseId = req.query.course_id;
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  let query = `
+    SELECT s.id          AS student_id,
+           s.id          AS id,
+           s.name        AS student_name,
+           s.name        AS name,
+           s.usn,
+           s.email,
+           s.semester,
+           p.name        AS programme_name,
+           s.programme_id
+    FROM students s
+    LEFT JOIN programmes p ON s.programme_id = p.id
+  `;
 
-  const fetchStudents = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/students", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  // If course_id provided (faculty marks entry), filter by programme+semester of that course
+  if (courseId) {
+    query = `
+      SELECT s.id          AS student_id,
+             s.id          AS id,
+             s.name        AS student_name,
+             s.name        AS name,
+             s.usn,
+             s.email,
+             s.semester,
+             p.name        AS programme_name,
+             s.programme_id
+      FROM students s
+      LEFT JOIN programmes p ON s.programme_id = p.id
+      INNER JOIN courses c ON c.programme_id = s.programme_id
+      WHERE c.id = ?
+      ORDER BY s.name
+    `;
+    return db.query(query, [courseId], (err, results) => {
+      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
+      res.json({ success: true, data: results });
+    });
+  }
 
-      const data = Array.isArray(res.data) ? res.data : res.data.data;
-      setStudents(data || []);
-    } catch (error) {
-      console.error("Error fetching students", error);
-      setError("Failed to load students. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredStudents = students.filter((student) => {
-    const searchText = search.toLowerCase().trim();
-    if (!searchText) return true;
-
-    const semFull  = `sem${student.semester}`;   // "sem1"
-    const semSpace = `sem ${student.semester}`;  // "sem 1"
-
-    return (
-      student.student_name?.toLowerCase().includes(searchText) ||
-      student.usn?.toLowerCase().includes(searchText) ||
-      student.email?.toLowerCase().includes(searchText) ||
-      student.programme_name?.toLowerCase().includes(searchText) ||
-      semFull.includes(searchText) ||    // "sem1".includes("sem") ✅
-      semSpace.includes(searchText) ||   // "sem 1".includes("sem") ✅
-      String(student.semester).includes(searchText)
-    );
+  db.query(query + " ORDER BY s.name", (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
+    res.json({ success: true, data: results });
   });
+});
 
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Students List</h2>
-
-      {/* Search Box */}
-      <input
-        type="text"
-        placeholder="Search by name, USN, email, sem1, MCA..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          padding: "10px",
-          width: "300px",
-          marginBottom: "20px",
-          border: "1px solid gray",
-          borderRadius: "4px",
-        }}
-      />
-
-      {/* Loading State */}
-      {loading && <p>Loading students...</p>}
-
-      {/* Error State */}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* Table */}
-      {!loading && !error && (
-        <table
-          border="1"
-          cellPadding="10"
-          style={{ borderCollapse: "collapse", width: "100%" }}
-        >
-          <thead style={{ backgroundColor: "#f2f2f2" }}>
-            <tr>
-              <th>#</th>
-              <th>USN</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Semester</th>
-              <th>Programme</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredStudents.length > 0 ? (
-              filteredStudents.map((student, idx) => (
-                <tr key={student.student_id}>
-                  <td>{idx + 1}</td>
-                  <td>{student.usn}</td>
-                  <td>{student.student_name}</td>
-                  <td>{student.email}</td>
-                  <td>Sem {student.semester}</td>
-                  <td>{student.programme_name}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" style={{ textAlign: "center", color: "#888" }}>
-                  No students found for "{search}"
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
-
-      {/* Result Count */}
-      {!loading && students.length > 0 && (
-        <p style={{ marginTop: "10px", color: "#555", fontSize: "14px" }}>
-          Showing {filteredStudents.length} of {students.length} students
-        </p>
-      )}
-    </div>
+// GET /api/students/:id (student views own profile)
+router.get("/:id", authMiddleware, (req, res) => {
+  db.query(
+    `SELECT s.id AS student_id, s.name AS student_name, s.usn, s.email,
+            s.semester, p.name AS programme_name
+     FROM students s
+     LEFT JOIN programmes p ON s.programme_id = p.id
+     WHERE s.id = ?`,
+    [req.params.id],
+    (err, results) => {
+      if (err) return res.status(500).json({ success: false, message: "DB error" });
+      if (results.length === 0) return res.status(404).json({ success: false, message: "Student not found" });
+      res.json({ success: true, data: results[0] });
+    }
   );
-};
+});
 
-export default StudentList;
+// POST /api/students (admin only)
+router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
+  const name         = req.body.student_name || req.body.name;
+  const { usn, email, semester, programme_id, password } = req.body;
+
+  if (!name || !usn || !email)
+    return res.status(400).json({ success: false, message: "Name, USN and email are required" });
+
+  db.query(
+    "INSERT INTO students (name, usn, email, semester, programme_id) VALUES (?, ?, ?, ?, ?)",
+    [name, usn, email, semester || 1, programme_id || null],
+    (err, result) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY")
+          return res.status(400).json({ success: false, message: "USN or email already exists" });
+        return res.status(500).json({ success: false, message: "Error adding student: " + err.message });
+      }
+
+      const studentId = result.insertId;
+      const loginPassword = password || "student123";
+
+      // Auto-create user account so student can login
+      db.query(
+        "INSERT IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, 'student')",
+        [name, email, loginPassword],
+        (err2) => {
+          if (err2) console.warn("Could not create user for student:", err2.message);
+          res.json({
+            success: true,
+            message: `Student added. Login: ${email} / ${loginPassword}`,
+            id: studentId,
+            data: {
+              student_id:   studentId,
+              student_name: name,
+              usn,
+              email,
+              semester:     semester || 1,
+              programme_id: programme_id || null,
+            },
+          });
+        }
+      );
+    }
+  );
+});
+
+// DELETE /api/students/:id (admin only)
+router.delete("/:id", authMiddleware, requireRole("admin"), (req, res) => {
+  db.query("DELETE FROM students WHERE id=?", [req.params.id], (err) => {
+    if (err) return res.status(500).json({ success: false, message: "Error deleting student" });
+    res.json({ success: true });
+  });
+});
+
+module.exports = router;
