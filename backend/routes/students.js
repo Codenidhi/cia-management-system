@@ -7,55 +7,47 @@ const { authMiddleware, requireRole } = require("../middleware/auth");
 router.get("/", authMiddleware, (req, res) => {
   const courseId = req.query.course_id;
 
-  let query = `
-    SELECT s.id          AS student_id,
-           s.id          AS id,
-           s.name        AS student_name,
-           s.name        AS name,
-           s.usn,
-           s.email,
-           s.semester,
-           p.name        AS programme_name,
-           s.programme_id
-    FROM students s
-    LEFT JOIN programmes p ON s.programme_id = p.id
-  `;
+  let query, params;
 
-  // If course_id provided (faculty marks entry), filter by programme+semester of that course
   if (courseId) {
+    // Faculty view — get students for this course's programme
     query = `
-      SELECT s.id          AS student_id,
-             s.id          AS id,
-             s.name        AS student_name,
-             s.name        AS name,
-             s.usn,
-             s.email,
-             s.semester,
-             p.name        AS programme_name,
-             s.programme_id
+      SELECT s.id AS student_id, s.id AS id,
+             s.name AS student_name, s.name AS name,
+             s.usn, s.email, s.semester,
+             p.name AS programme_name, s.programme_id
       FROM students s
       LEFT JOIN programmes p ON s.programme_id = p.id
-      INNER JOIN courses c ON c.programme_id = s.programme_id
+      LEFT JOIN courses c ON c.programme_id = s.programme_id
       WHERE c.id = ?
       ORDER BY s.name
     `;
-    return db.query(query, [courseId], (err, results) => {
-      if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
-      res.json({ success: true, data: results });
-    });
+    params = [courseId];
+  } else {
+    // Admin view — all students
+    query = `
+      SELECT s.id AS student_id, s.id AS id,
+             s.name AS student_name, s.name AS name,
+             s.usn, s.email, s.semester,
+             p.name AS programme_name, s.programme_id
+      FROM students s
+      LEFT JOIN programmes p ON s.programme_id = p.id
+      ORDER BY s.name
+    `;
+    params = [];
   }
 
-  db.query(query + " ORDER BY s.name", (err, results) => {
+  db.query(query, params, (err, results) => {
     if (err) return res.status(500).json({ success: false, message: "DB error: " + err.message });
     res.json({ success: true, data: results });
   });
 });
 
-// GET /api/students/:id (student views own profile)
+// GET /api/students/:id
 router.get("/:id", authMiddleware, (req, res) => {
   db.query(
-    `SELECT s.id AS student_id, s.name AS student_name, s.usn, s.email,
-            s.semester, p.name AS programme_name
+    `SELECT s.id AS student_id, s.id AS id, s.name AS student_name,
+            s.usn, s.email, s.semester, p.name AS programme_name
      FROM students s
      LEFT JOIN programmes p ON s.programme_id = p.id
      WHERE s.id = ?`,
@@ -70,7 +62,7 @@ router.get("/:id", authMiddleware, (req, res) => {
 
 // POST /api/students (admin only)
 router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
-  const name         = req.body.student_name || req.body.name;
+  const name = req.body.student_name || req.body.name;
   const { usn, email, semester, programme_id, password } = req.body;
 
   if (!name || !usn || !email)
@@ -89,24 +81,16 @@ router.post("/", authMiddleware, requireRole("admin"), (req, res) => {
       const studentId = result.insertId;
       const loginPassword = password || "student123";
 
-      // Auto-create user account so student can login
       db.query(
         "INSERT IGNORE INTO users (name, email, password, role) VALUES (?, ?, ?, 'student')",
         [name, email, loginPassword],
         (err2) => {
-          if (err2) console.warn("Could not create user for student:", err2.message);
+          if (err2) console.warn("Could not create user:", err2.message);
           res.json({
             success: true,
             message: `Student added. Login: ${email} / ${loginPassword}`,
             id: studentId,
-            data: {
-              student_id:   studentId,
-              student_name: name,
-              usn,
-              email,
-              semester:     semester || 1,
-              programme_id: programme_id || null,
-            },
+            data: { student_id: studentId, id: studentId, student_name: name, usn, email, semester: semester || 1, programme_id: programme_id || null },
           });
         }
       );
