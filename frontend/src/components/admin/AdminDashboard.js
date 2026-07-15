@@ -414,7 +414,10 @@ const AdminDashboard = ({ onLogout }) => {
                       <td>{s.programme_name || '-'}</td>
                       <td>Sem {s.semester}</td>
                       <td className="text-small">{s.email || '-'}</td>
-                      <td><button className="delete-btn" onClick={() => handleDelete(deleteStudent, s.student_id, 'Student')}>Delete</button></td>
+                      <td style={{display:'flex',gap:6}}>
+                        <button className="edit-btn" onClick={() => dispatch(openEditModal({ entityType: 'student', data: s }))}><Pencil size={13} /> Edit</button>
+                        <button className="delete-btn" onClick={() => handleDelete(deleteStudent, s.student_id, 'Student')}>Delete</button>
+                      </td>
                     </tr>
                   ))}</tbody>
                 </table><div className="results-count">Showing {fStuds.length} of {students.length} students</div></div>
@@ -448,7 +451,10 @@ const AdminDashboard = ({ onLogout }) => {
                       <td>{f.designation || '-'}</td>
                       <td>{f.department_name || '-'}</td>
                       <td className="text-small">{f.email || '-'}</td>
-                      <td><button className="delete-btn" onClick={() => handleDelete(deleteFaculty, f.faculty_id, 'Faculty')}>Delete</button></td>
+                      <td style={{display:'flex',gap:6}}>
+                        <button className="edit-btn" onClick={() => dispatch(openEditModal({ entityType: 'faculty', data: f }))}><Pencil size={13} /> Edit</button>
+                        <button className="delete-btn" onClick={() => handleDelete(deleteFaculty, f.faculty_id, 'Faculty')}>Delete</button>
+                      </td>
                     </tr>
                   ))}</tbody>
                 </table><div className="results-count">Showing {fFac.length} of {faculty.length} faculty members</div></div>
