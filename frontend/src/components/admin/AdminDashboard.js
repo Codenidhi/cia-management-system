@@ -7,8 +7,8 @@ import {
   fetchAllData,
   addDepartment, updateDepartment, deleteDepartment,
   addProgramme,  updateProgramme,  deleteProgramme,
-  addStudent,    deleteStudent,
-  addFaculty,    deleteFaculty,
+  addStudent,    updateStudent,    deleteStudent,
+  addFaculty,    updateFaculty,    deleteFaculty,
   addCourse,     deleteCourse,
   addCIAComponent, updateCIAComponent, deleteCIAComponent,
   updateMarks,
@@ -612,6 +612,8 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
       assessment_type: initialData.assessment_type,
     };
     if (entityType === 'marks') return { marks_obtained: initialData.marks_obtained };
+    if (entityType === 'student') return { student_name: initialData.student_name, usn: initialData.usn, email: initialData.email, semester: initialData.semester, programme_id: initialData.programme_id };
+    if (entityType === 'faculty') return { faculty_name: initialData.faculty_name, email: initialData.email, designation: initialData.designation || '', department_id: initialData.department_id };
     return {};
   };
 
@@ -647,8 +649,8 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
         await dispatch(updateCIAComponent({ id: initialData.cia_id, data: formData })).unwrap();
         onSuccess('CIA Component updated successfully!'); return;
       }
-      if (entityType === 'student') { await dispatch(addStudent(formData)).unwrap(); onSuccess('Student added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'student123')); return; }
-      if (entityType === 'faculty') { await dispatch(addFaculty(formData)).unwrap(); onSuccess('Faculty added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'faculty123')); return; }
+      if (entityType === 'student') { if (isEdit) { await dispatch(updateStudent({ id: initialData.student_id, data: formData })).unwrap(); onSuccess('Student updated!'); } else { await dispatch(addStudent(formData)).unwrap(); onSuccess('Student added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'student123')); } return; }
+      if (entityType === 'faculty') { if (isEdit) { await dispatch(updateFaculty({ id: initialData.faculty_id, data: formData })).unwrap(); onSuccess('Faculty updated!'); } else { await dispatch(addFaculty(formData)).unwrap(); onSuccess('Faculty added! Login: ' + (formData.email || '') + ' / ' + (formData.password || 'faculty123')); } return; }
       if (entityType === 'course')  { await dispatch(addCourse(formData)).unwrap();  onSuccess('Course added successfully!');  return; }
       onError('Unknown entity type');
     } catch (err) { onError('Error: ' + (err.message || err)); }
@@ -708,7 +710,7 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
                 {programmes.map(p => <option key={p.programme_id} value={p.programme_id}>{p.programme_name}</option>)}
               </select></div>
             <div className="form-group"><label>Semester *</label>
-              <input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
+              <input type="number" name="semester" required onChange={hc} value={formData.semester || ''} min="1" max="12" /></div>
             <div className="form-group"><label>Faculty</label>
               <select name="faculty_id" onChange={hc}>
                 <option value="">Select Faculty</option>
@@ -734,18 +736,18 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
           {/* ── STUDENT ── */}
           {entityType === 'student' && (<>
             <div className="form-group"><label>Full Name *</label>
-              <input type="text" name="student_name" required onChange={hc} placeholder="e.g., Ravi Kumar" /></div>
+              <input type="text" name="student_name" required onChange={hc} value={formData.student_name || ''} placeholder="e.g., Ravi Kumar" /></div>
             <div className="form-group"><label>USN *</label>
-              <input type="text" name="usn" required onChange={hc} placeholder="e.g., 1CA24MC001" /></div>
+              <input type="text" name="usn" required onChange={hc} value={formData.usn || ''} placeholder="e.g., 1CA24MC001" /></div>
             <div className="form-group"><label>Email *</label>
-              <input type="email" name="email" required onChange={hc} placeholder="e.g., ravi@student.edu" /></div>
+              <input type="email" name="email" required onChange={hc} value={formData.email || ''} placeholder="e.g., ravi@student.edu" /></div>
             <div className="form-group"><label>Programme *</label>
               <select name="programme_id" required onChange={hc}>
                 <option value="">Select Programme</option>
                 {programmes.map(p => <option key={p.programme_id} value={p.programme_id}>{p.programme_name}</option>)}
               </select></div>
             <div className="form-group"><label>Semester *</label>
-              <input type="number" name="semester" required onChange={hc} min="1" max="12" /></div>
+              <input type="number" name="semester" required onChange={hc} value={formData.semester || ''} min="1" max="12" /></div>
             <div className="form-group"><label>Password *</label>
               <input type="password" name="password" required onChange={hc} placeholder="Set login password" /></div>
           </>)}
@@ -753,9 +755,9 @@ const FormModal = ({ mode, entityType, initialData, onClose, onSuccess, onError,
           {/* ── FACULTY ── */}
           {entityType === 'faculty' && (<>
             <div className="form-group"><label>Full Name *</label>
-              <input type="text" name="faculty_name" required onChange={hc} placeholder="e.g., Dr. Priya Sharma" /></div>
+              <input type="text" name="faculty_name" required onChange={hc} value={formData.faculty_name || ''} placeholder="e.g., Dr. Priya Sharma" /></div>
             <div className="form-group"><label>Email *</label>
-              <input type="email" name="email" required onChange={hc} placeholder="e.g., priya@college.edu" /></div>
+              <input type="email" name="email" required onChange={hc} value={formData.email || ''} placeholder="e.g., priya@college.edu" /></div>
             <div className="form-group"><label>Designation *</label>
               <select name="designation" required onChange={hc}>
                 <option value="">Select Designation</option>
