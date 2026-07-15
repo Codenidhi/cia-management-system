@@ -107,3 +107,19 @@ router.delete("/:id", authMiddleware, requireRole("admin"), (req, res) => {
 });
 
 module.exports = router;
+
+// PUT /api/students/:id (admin)
+router.put("/:id", authMiddleware, requireRole("admin"), (req, res) => {
+  const name = req.body.student_name || req.body.name;
+  const { usn, email, semester, programme_id } = req.body;
+  if (!name || !usn || !email)
+    return res.status(400).json({ success: false, message: "Name, USN and email required" });
+  db.query(
+    "UPDATE students SET name=?, usn=?, email=?, semester=?, programme_id=? WHERE id=?",
+    [name, usn, email, semester || 1, programme_id || null, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false, message: "Error updating student" });
+      res.json({ success: true, message: "Student updated successfully" });
+    }
+  );
+});
