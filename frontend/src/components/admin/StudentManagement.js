@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStudents, addStudent, deleteStudent } from "../../store/slices/studentsSlice";
+import axios from "axios";
+import API_URL from "../../config";
 
+const getHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 const EMPTY_FORM = { usn: "", name: "", email: "", semester: "1" };
 
 export default function StudentManagement() {
@@ -11,6 +14,7 @@ export default function StudentManagement() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [message, setMessage] = useState(null);
   const [search, setSearch] = useState("");
+  const [editStudent, setEditStudent] = useState(null);
 
   useEffect(() => { dispatch(fetchStudents()); }, [dispatch]);
 
@@ -24,6 +28,27 @@ export default function StudentManagement() {
       dispatch(fetchStudents());
     } else {
       setMessage({ type: "error", text: "❌ " + (result.payload || "Failed to add student") });
+    }
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  const handleEdit = (s) => {
+    setEditStudent({ ...s });
+  };
+
+  const handleEditSave = async () => {
+    try {
+      await axios.put(`${API_URL}/students/${editStudent.id}`, {
+        name: editStudent.name,
+        email: editStudent.email,
+        semester: editStudent.semester,
+        usn: editStudent.usn,
+      }, { headers: getHeaders() });
+      setMessage({ type: "success", text: "✅ Student updated successfully!" });
+      setEditStudent(null);
+      dispatch(fetchStudents());
+    } catch (err) {
+      setMessage({ type: "error", text: "❌ " + (err.response?.data?.message || "Failed to update") });
     }
     setTimeout(() => setMessage(null), 3000);
   };
@@ -93,6 +118,43 @@ export default function StudentManagement() {
         </form>
       )}
 
+      {/* Edit Modal */}
+      {editStudent && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 32, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <h3 style={{ color: "#800000", marginBottom: 20 }}>✏️ Edit Student</h3>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">USN</label>
+                <input className="form-input" value={editStudent.usn}
+                  onChange={(e) => setEditStudent({ ...editStudent, usn: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
+                <input className="form-input" value={editStudent.name}
+                  onChange={(e) => setEditStudent({ ...editStudent, name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" type="email" value={editStudent.email}
+                  onChange={(e) => setEditStudent({ ...editStudent, email: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Semester</label>
+                <select className="form-input form-select" value={editStudent.semester}
+                  onChange={(e) => setEditStudent({ ...editStudent, semester: e.target.value })}>
+                  {[1,2,3,4].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button className="btn btn-primary" onClick={handleEditSave}>💾 Save Changes</button>
+              <button className="btn btn-outline" onClick={() => setEditStudent(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div style={{ marginBottom: 16 }}>
         <input
@@ -119,7 +181,7 @@ export default function StudentManagement() {
               <th>Name</th>
               <th>Email</th>
               <th style={{ textAlign: "center" }}>Semester</th>
-              <th style={{ textAlign: "center" }}>Action</th>
+              <th style={{ textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -134,7 +196,8 @@ export default function StudentManagement() {
                 <td style={{ fontWeight: 500 }}>{s.name}</td>
                 <td style={{ fontSize: 13, color: "#666" }}>{s.email}</td>
                 <td style={{ textAlign: "center" }}>Sem {s.semester}</td>
-                <td style={{ textAlign: "center" }}>
+                <td style={{ textAlign: "center", display: "flex", gap: 6, justifyContent: "center" }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => handleEdit(s)}>✏️ Edit</button>
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s)}>🗑️ Delete</button>
                 </td>
               </tr>
